@@ -80,26 +80,25 @@ const CATEGORIES = [
 ];
 
 const INITIAL_PEOPLE = [
-  "Alex Chen",
-  "Jordan Lee",
-  "Sam Rivera",
-  "Taylor Kim",
-  "Morgan Patel",
-  "Casey Jones",
-  "Riley Smith",
-  "Drew Martinez",
-  "Quinn Johnson",
-  "Avery Williams",
-  "Blake Davis",
-  "Cameron Wilson",
-  "Devin Anderson",
-  "Emery Thomas",
-  "Finley Jackson",
-  "Gray Harris",
-  "Harper Lewis",
-  "Indigo Clark",
-  "Jamie Robinson",
-  "Kennedy Walker",
+  "Andrea",
+  "Andrew",
+  "David",
+  "JR",
+  "Jonah",
+  "Mildred",
+  "Sam",
+  "Sandra",
+  "Taylor",
+  "Arron",
+  "Don",
+  "Drixter",
+  "Evan",
+  "Jennifer",
+  "Mischa",
+  "Paul",
+  "Ren",
+  "Rod",
+  "Rosie",
 ];
 
 const AVATAR_COLORS = [
@@ -591,9 +590,13 @@ export default function VibeShowdown() {
   // Randomized voting order (set when show starts)
   const [voterOrder, setVoterOrder] = useState([]);
 
+  // Presentation order (same for all voters, set once at show start)
+  const [presentationOrder, setPresentationOrder] = useState([]);
+
   const [activeVoter, setActiveVoter] = useState(null);
   const [allVotes, setAllVotes] = useState({});
   const [doneVoters, setDoneVoters] = useState(new Set());
+  const [claimedVoters, setClaimedVoters] = useState(new Set());
   const [showLock, setShowLock] = useState(false);
   const [pendingVoter, setPendingVoter] = useState(null);
 
@@ -614,17 +617,27 @@ export default function VibeShowdown() {
 
   const participants = people;
   const regularVoters = voterOrder.length > 0 ? voterOrder : people;
-  const pendingVoters = regularVoters.filter((p) => !doneVoters.has(p));
-  const allRegularDone = voterOrder.length > 0 && pendingVoters.length === 0;
+  const pendingVoters = regularVoters.filter(
+    (p) => !doneVoters.has(p) && !claimedVoters.has(p)
+  );
+  const allRegularDone =
+    voterOrder.length > 0 &&
+    regularVoters.every(
+      (p) => doneVoters.has(p) || claimedVoters.has(p)
+    );
+  const allVotesSubmitted =
+    voterOrder.length > 0 &&
+    regularVoters.every((p) => doneVoters.has(p));
 
   function startShow() {
     if (people.length < 2) return;
     setVoterOrder(shuffle(people));
+    setPresentationOrder(shuffle(people));
     setPhase("login");
   }
 
   function targetsFor(voter) {
-    return participants.filter((p) => p !== voter);
+    return presentationOrder.filter((p) => p !== voter);
   }
 
   function requestVoting(voter) {
@@ -635,16 +648,12 @@ export default function VibeShowdown() {
   function unlockAndVote() {
     setShowLock(false);
     const voter = pendingVoter;
+    setClaimedVoters((prev) => new Set([...prev, voter]));
     setActiveVoter(voter);
-    const targets = shuffle(targetsFor(voter));
     const existing = allVotes[voter] || {};
-    setCurrentScores({ ...existing, _order: targets });
+    setCurrentScores(existing);
     setScoringIdx(0);
     setPhase("voting");
-  }
-
-  function getTargetOrder() {
-    return currentScores._order || targetsFor(activeVoter);
   }
 
   function setScore(participantName, catId, val) {
@@ -658,8 +667,7 @@ export default function VibeShowdown() {
   }
 
   function submitVoterScores() {
-    const { _order, ...scores } = currentScores;
-    setAllVotes((prev) => ({ ...prev, [activeVoter]: scores }));
+    setAllVotes((prev) => ({ ...prev, [activeVoter]: currentScores }));
     setDoneVoters((prev) => new Set([...prev, activeVoter]));
     setActiveVoter(null);
     setCurrentScores({});
@@ -785,7 +793,7 @@ export default function VibeShowdown() {
   }
 
   /* ── Current voting state ── */
-  const votingTargets = activeVoter ? getTargetOrder() : [];
+  const votingTargets = activeVoter ? targetsFor(activeVoter) : [];
   const currentTarget = votingTargets[scoringIdx];
   const currentTargetScores = currentScores[currentTarget] || {};
   const currentTargetComplete = CATEGORIES.every(
@@ -1222,30 +1230,34 @@ export default function VibeShowdown() {
           >
             {voterOrder.map((p) => {
               const done = doneVoters.has(p);
+              const claimed = claimedVoters.has(p) && !done;
+              const unavailable = done || claimed;
               const i = people.indexOf(p);
               const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
               return (
                 <button
                   key={p}
-                  onClick={() => !done && requestVoting(p)}
-                  disabled={done}
+                  onClick={() => !unavailable && requestVoting(p)}
+                  disabled={unavailable}
                   style={{
-                    background: done
+                    background: unavailable
                       ? "rgba(255,255,255,0.04)"
                       : `linear-gradient(135deg, ${color}22, ${color}11)`,
                     border: done
                       ? "1px solid rgba(255,255,255,0.07)"
-                      : `2px solid ${color}55`,
+                      : claimed
+                        ? "2px dashed rgba(255,230,109,0.4)"
+                        : `2px solid ${color}55`,
                     borderRadius: 18,
                     padding: "18px 14px",
-                    cursor: done ? "default" : "pointer",
+                    cursor: unavailable ? "default" : "pointer",
                     textAlign: "center",
                     transition: "transform 0.15s, box-shadow 0.15s",
-                    opacity: done ? 0.5 : 1,
+                    opacity: unavailable ? 0.5 : 1,
                     fontFamily: "inherit",
                   }}
                   onMouseEnter={(e) => {
-                    if (!done)
+                    if (!unavailable)
                       e.currentTarget.style.transform = "translateY(-4px)";
                   }}
                   onMouseLeave={(e) => {
@@ -1257,22 +1269,26 @@ export default function VibeShowdown() {
                       width: 52,
                       height: 52,
                       borderRadius: "50%",
-                      background: done ? "rgba(255,255,255,0.1)" : color,
+                      background: done
+                        ? "rgba(255,255,255,0.1)"
+                        : claimed
+                          ? "rgba(255,230,109,0.2)"
+                          : color,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       margin: "0 auto 10px",
                       fontSize: 18,
                       fontWeight: 900,
-                      color: done ? "rgba(255,255,255,0.3)" : "#000",
-                      boxShadow: done ? "none" : `0 4px 16px ${color}66`,
+                      color: unavailable ? "rgba(255,255,255,0.3)" : "#000",
+                      boxShadow: unavailable ? "none" : `0 4px 16px ${color}66`,
                     }}
                   >
-                    {done ? "✓" : initials(p)}
+                    {done ? "✓" : claimed ? "⏳" : initials(p)}
                   </div>
                   <div
                     style={{
-                      color: done ? "rgba(255,255,255,0.3)" : "#fff",
+                      color: unavailable ? "rgba(255,255,255,0.3)" : "#fff",
                       fontWeight: 700,
                       fontSize: 14,
                     }}
@@ -1282,11 +1298,15 @@ export default function VibeShowdown() {
                   <div
                     style={{
                       fontSize: 11,
-                      color: done ? "#4ECDC4" : "rgba(255,255,255,0.35)",
+                      color: done
+                        ? "#4ECDC4"
+                        : claimed
+                          ? "#FFE66D"
+                          : "rgba(255,255,255,0.35)",
                       marginTop: 4,
                     }}
                   >
-                    {done ? "Voted ✅" : "🔒 Tap to vote"}
+                    {done ? "Voted ✅" : claimed ? "Voting... ⏳" : "🔒 Tap to vote"}
                   </div>
                 </button>
               );
@@ -1351,24 +1371,24 @@ export default function VibeShowdown() {
                       fontSize: 13,
                     }}
                   >
-                    {allRegularDone
+                    {allVotesSubmitted
                       ? "All team votes are in. Time for the CEO vote! 🔥"
-                      : `Waiting for ${pendingVoters.length} more voter${pendingVoters.length !== 1 ? "s" : ""}...`}
+                      : `Waiting for ${voterOrder.length - doneVoters.size} more voter${voterOrder.length - doneVoters.size !== 1 ? "s" : ""}...`}
                   </div>
                 </div>
               </div>
               <button
                 onClick={startCeoVoting}
-                disabled={!allRegularDone}
+                disabled={!allVotesSubmitted}
                 style={{
                   ...S.btn(
-                    allRegularDone
+                    allVotesSubmitted
                       ? "linear-gradient(135deg, #FFE66D, #FF6B6B)"
                       : "rgba(255,255,255,0.1)",
-                    allRegularDone ? "#1a0533" : "rgba(255,255,255,0.3)"
+                    allVotesSubmitted ? "#1a0533" : "rgba(255,255,255,0.3)"
                   ),
-                  opacity: allRegularDone ? 1 : 0.5,
-                  cursor: allRegularDone ? "pointer" : "not-allowed",
+                  opacity: allVotesSubmitted ? 1 : 0.5,
+                  cursor: allVotesSubmitted ? "pointer" : "not-allowed",
                 }}
               >
                 {ceoDone ? "✅ Voted" : "👑 Cast CEO Vote"}
@@ -2774,12 +2794,14 @@ export default function VibeShowdown() {
                   setPhase("setup");
                   setAllVotes({});
                   setDoneVoters(new Set());
+                  setClaimedVoters(new Set());
                   setCeoScores({});
                   setCeoDone(false);
                   setResults([]);
                   setRevealed([]);
                   setAllRevealed(false);
                   setVoterOrder([]);
+                  setPresentationOrder([]);
                   setAutoRevealing(false);
                   setRevealingIdx(-1);
                 }}
