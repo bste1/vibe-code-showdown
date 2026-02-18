@@ -683,69 +683,6 @@ export default function VibeShowdown() {
     setPhase("login");
   }
 
-  /* ── TEST: simulate all votes with random scores ── */
-  function simulateAllVotes() {
-    const order = shuffle(people);
-    const presOrder = shuffle(people);
-    setVoterOrder(order);
-    setPresentationOrder(presOrder);
-
-    const fakeVotes = {};
-    order.forEach((voter) => {
-      fakeVotes[voter] = {};
-      presOrder
-        .filter((p) => p !== voter)
-        .forEach((target) => {
-          fakeVotes[voter][target] = {};
-          CATEGORIES.forEach((cat) => {
-            fakeVotes[voter][target][cat.id] = Math.floor(Math.random() * 5) + 1;
-          });
-        });
-    });
-    setAllVotes(fakeVotes);
-    setDoneVoters(new Set(order));
-    setClaimedVoters(new Set(order));
-
-    const fakeCeo = {};
-    presOrder.forEach((target) => {
-      fakeCeo[target] = {};
-      CATEGORIES.forEach((cat) => {
-        fakeCeo[target][cat.id] = Math.floor(Math.random() * 5) + 1;
-      });
-    });
-    setCeoScores(fakeCeo);
-    setCeoDone(true);
-
-    const scored = presOrder.map((p) => {
-      const ceo = fakeCeo[p] || {};
-      const ceoTotal = CATEGORIES.reduce((s, c) => s + (ceo[c.id] || 0), 0);
-      const voterList = order.filter((v) => v !== p);
-      const catMeans = CATEGORIES.map((cat) => {
-        const vals = voterList.map((v) => fakeVotes[v]?.[p]?.[cat.id] || 0);
-        return vals.reduce((a, b) => a + b, 0) / vals.length;
-      });
-      const teamRaw = catMeans.reduce((a, b) => a + b, 0);
-      return {
-        name: p,
-        ceoTotal: Math.round(ceoTotal * 10) / 10,
-        teamTotal: Math.round(teamRaw * 10) / 10,
-        total: Math.round((ceoTotal + teamRaw) * 10) / 10,
-        catBreakdown: CATEGORIES.map((cat, i) => ({
-          id: cat.id,
-          icon: cat.icon,
-          name: cat.name,
-          ceo: ceo[cat.id] || 0,
-          team: Math.round(catMeans[i] * 10) / 10,
-        })),
-      };
-    });
-    scored.sort((a, b) => b.total - a.total);
-    setResults(scored);
-    setRevealed(Array(scored.length).fill(false));
-    setRevealingIdx(-1);
-    setPhase("results");
-  }
-
   function startCeoVoting() {
     setPhase("ceo");
     setCeoCurrent(0);
@@ -948,40 +885,13 @@ export default function VibeShowdown() {
     },
   };
 
-  /* ── TEST BUTTON (remove before production) ── */
-  const testBtn = (
-    <button
-      onClick={simulateAllVotes}
-      style={{
-        position: "fixed",
-        top: 12,
-        right: 12,
-        zIndex: 10000,
-        background: "linear-gradient(135deg, #ff0066, #ff6600)",
-        color: "#fff",
-        border: "2px solid rgba(255,255,255,0.3)",
-        borderRadius: 10,
-        padding: "8px 16px",
-        fontWeight: 900,
-        fontSize: 12,
-        cursor: "pointer",
-        fontFamily: "'Trebuchet MS', sans-serif",
-        letterSpacing: 1,
-        textTransform: "uppercase",
-        boxShadow: "0 4px 20px rgba(255,0,102,0.5)",
-      }}
-    >
-      🧪 TEST: Skip to Results
-    </button>
-  );
-
   /* ═══════════════════════════════════════════════════════════════
      PHASE: SETUP
   ═══════════════════════════════════════════════════════════════ */
   if (phase === "setup")
     return (
       <div style={S.root}>
-        {testBtn}
+
         <StarBg />
         <div style={S.page}>
           <div style={{ textAlign: "center", marginBottom: 40 }}>
@@ -1223,7 +1133,7 @@ export default function VibeShowdown() {
   if (phase === "login")
     return (
       <div style={S.root}>
-        {testBtn}
+
         <StarBg />
         {showLock && pendingVoter && (
           <LockScreen voterName={pendingVoter} onUnlock={unlockAndVote} />
@@ -1593,7 +1503,7 @@ export default function VibeShowdown() {
 
     return (
       <div style={S.root}>
-        {testBtn}
+
         <StarBg />
         <div style={S.page}>
           {/* Top bar */}
@@ -2019,7 +1929,7 @@ export default function VibeShowdown() {
 
     return (
       <div style={S.root}>
-        {testBtn}
+
         <StarBg />
         <div style={S.page}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
@@ -2451,7 +2361,7 @@ export default function VibeShowdown() {
 
     return (
       <div style={S.root}>
-        {testBtn}
+
         <StarBg />
         <Confetti active={confetti} />
         <UnicornCelebration active={unicorns} />
