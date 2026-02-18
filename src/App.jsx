@@ -614,6 +614,7 @@ export default function VibeShowdown() {
   const [unicorns, setUnicorns] = useState(false);
   const [sadRain, setSadRain] = useState(false);
   const [autoRevealing, setAutoRevealing] = useState(false);
+  const [ceoAlert, setCeoAlert] = useState(false);
 
   const participants = people;
   const regularVoters = voterOrder.length > 0 ? voterOrder : people;
@@ -667,8 +668,15 @@ export default function VibeShowdown() {
   }
 
   function submitVoterScores() {
-    setAllVotes((prev) => ({ ...prev, [activeVoter]: currentScores }));
-    setDoneVoters((prev) => new Set([...prev, activeVoter]));
+    const voter = activeVoter;
+    setAllVotes((prev) => ({ ...prev, [voter]: currentScores }));
+    setDoneVoters((prev) => {
+      const next = new Set([...prev, voter]);
+      if (voterOrder.every((p) => next.has(p))) {
+        setCeoAlert(true);
+      }
+      return next;
+    });
     setActiveVoter(null);
     setCurrentScores({});
     setScoringIdx(0);
@@ -1127,6 +1135,89 @@ export default function VibeShowdown() {
         <StarBg />
         {showLock && pendingVoter && (
           <LockScreen voterName={pendingVoter} onUnlock={unlockAndVote} />
+        )}
+
+        {/* CEO Alert — all team votes are in */}
+        {ceoAlert && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 200,
+              background: "rgba(0,0,0,0.85)",
+              backdropFilter: "blur(20px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "column",
+              gap: 20,
+              animation: "slideInUp 0.5s ease",
+            }}
+          >
+            <div style={{ fontSize: 80, animation: "crownBounce 2s ease-in-out infinite" }}>👑</div>
+            <h2
+              style={{
+                color: "#FFE66D",
+                fontWeight: 900,
+                fontSize: 32,
+                fontFamily: "'Trebuchet MS', sans-serif",
+                textAlign: "center",
+                margin: 0,
+              }}
+            >
+              ALL TEAM VOTES ARE IN!
+            </h2>
+            <p
+              style={{
+                color: "rgba(255,255,255,0.6)",
+                fontSize: 18,
+                textAlign: "center",
+                maxWidth: 420,
+                lineHeight: 1.5,
+                fontFamily: "'Trebuchet MS', sans-serif",
+                margin: 0,
+              }}
+            >
+              {voterOrder.length} team members have submitted their scores.
+              <br />
+              It's your turn, Ben. The CEO Super Vote awaits.
+            </p>
+            <button
+              onClick={() => {
+                setCeoAlert(false);
+                startCeoVoting();
+              }}
+              style={{
+                background: "linear-gradient(135deg, #FFE66D, #FF6B6B)",
+                color: "#1a0533",
+                border: "none",
+                borderRadius: 14,
+                padding: "16px 48px",
+                fontWeight: 900,
+                fontSize: 20,
+                cursor: "pointer",
+                fontFamily: "'Trebuchet MS', sans-serif",
+                boxShadow: "0 8px 40px rgba(255,230,109,0.4)",
+                animation: "pulse 2s ease-in-out infinite",
+                marginTop: 8,
+              }}
+            >
+              👑 LET'S GO — Cast CEO Vote
+            </button>
+            <button
+              onClick={() => setCeoAlert(false)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "rgba(255,255,255,0.3)",
+                fontSize: 14,
+                cursor: "pointer",
+                fontFamily: "'Trebuchet MS', sans-serif",
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
         )}
         <div style={S.page}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -2797,6 +2888,7 @@ export default function VibeShowdown() {
                   setClaimedVoters(new Set());
                   setCeoScores({});
                   setCeoDone(false);
+                  setCeoAlert(false);
                   setResults([]);
                   setRevealed([]);
                   setAllRevealed(false);
