@@ -581,7 +581,7 @@ function ScratchCard({ width, height, onComplete, children }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MAIN APP
+   MAIN APP — Round-based: one candidate at a time, everyone votes together
 ═══════════════════════════════════════════════════════════════ */
 export default function VibeShowdown() {
   const [phase, setPhase] = useState("loading");
@@ -594,17 +594,17 @@ export default function VibeShowdown() {
   const [presentationOrder, setPresentationOrder] = useState([]);
 
   const [activeVoter, setActiveVoter] = useState(null);
-  const [allVotes, setAllVotes] = useState({});
   const [doneVoters, setDoneVoters] = useState(new Set());
   const [claimedVoters, setClaimedVoters] = useState(new Set());
   const [showLock, setShowLock] = useState(false);
   const [pendingVoter, setPendingVoter] = useState(null);
 
-  const [currentScores, setCurrentScores] = useState({});
-  const [scoringIdx, setScoringIdx] = useState(0);
-  const [ceoScores, setCeoScores] = useState({});
-  const [ceoCurrent, setCeoCurrent] = useState(0);
-  const [ceoDone, setCeoDone] = useState(false);
+  // Round-based voting
+  const [currentRound, setCurrentRound] = useState(0);
+  const [roundScores, setRoundScores] = useState({});
+  const [myVoteSubmitted, setMyVoteSubmitted] = useState(false);
+  const [roundVoteCount, setRoundVoteCount] = useState(0);
+  const [totalVoters, setTotalVoters] = useState(0);
 
   const [results, setResults] = useState([]);
   const [revealed, setRevealed] = useState([]);
@@ -614,18 +614,19 @@ export default function VibeShowdown() {
   const [unicorns, setUnicorns] = useState(false);
   const [sadRain, setSadRain] = useState(false);
   const [autoRevealing, setAutoRevealing] = useState(false);
-  const [ceoAlert, setCeoAlert] = useState(false);
 
   const subscriptionRef = useRef(null);
+  const sessionSubRef = useRef(null);
+  const votesSubRef = useRef(null);
 
   const participants = people;
-  const regularVoters = voterOrder.length > 0 ? voterOrder : people;
-  const pendingVoters = regularVoters.filter(
+  const pendingVoters = voterOrder.filter(
     (p) => !doneVoters.has(p) && !claimedVoters.has(p)
   );
-  const allVotesSubmitted =
-    voterOrder.length > 0 &&
-    regularVoters.every((p) => doneVoters.has(p));
+
+  const currentCandidate = presentationOrder[currentRound] || null;
+  const isLastRound = currentRound >= presentationOrder.length - 1;
+  const allRoundVotesIn = totalVoters > 0 && roundVoteCount >= totalVoters;
 
   /* ── On mount: check URL for ?s=sessionId ── */
   useEffect(() => {
@@ -655,9 +656,15 @@ export default function VibeShowdown() {
     setPeople(data.participants);
     setVoterOrder(data.voter_order);
     setPresentationOrder(data.presentation_order);
+    setCurrentRound(data.current_round || 0);
     await loadClaims(sid);
     subscribeToClaims(sid);
-    setPhase("login");
+    subscribeToSession(sid);
+    if (data.phase === "voting") {
+      setPhase("login");
+    } else {
+      setPhase(data.phase || "login");
+    }
   }
 
   async function loadClaims(sid) {
@@ -684,27 +691,86 @@ export default function VibeShowdown() {
       .channel(`claims-${sid}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "claims",
-          filter: `session_id=eq.${sid}`,
-        },
-        () => {
-          loadClaims(sid);
-        }
+        { event: "*", schema: "public", table: "claims", filter: `session_id=eq.${sid}` },
+        () => loadClaims(sid)
       )
       .subscribe();
     subscriptionRef.current = channel;
   }
 
+  function subscribeToSession(sid) {
+    if (sessionSubRef.current) {
+      supabase.removeChannel(sessionSubRef.current);
+    }
+    const channel = supabase
+      .channel(`session-${sid}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "sessions", filter: `id=eq.${sid}` },
+        (payload) => {
+          const row = payload.new;
+          if (row.current_round != null) {
+            setCurrentRound(row.current_round);
+            setMyVoteSubmitted(false);
+            setRoundScores({});
+          }
+          if (row.phase) {
+            if (row.phase === "voting" && phase === "login") {
+              // don't override — voter still needs to claim name
+            } else if (row.phase === "results") {
+              // only CEO triggers results locally
+            }
+          }
+        }
+      )
+      .subscribe();
+    sessionSubRef.current = channel;
+  }
+
+  function subscribeToVotes(sid, candidateName) {
+    if (votesSubRef.current) {
+      supabase.removeChannel(votesSubRef.current);
+    }
+    loadRoundVoteCount(sid, candidateName);
+    const channel = supabase
+      .channel(`votes-${sid}-${candidateName}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "votes", filter: `session_id=eq.${sid}` },
+        () => loadRoundVoteCount(sid, candidateName)
+      )
+      .subscribe();
+    votesSubRef.current = channel;
+  }
+
+  async function loadRoundVoteCount(sid, candidateName) {
+    const { data } = await supabase
+      .from("votes")
+      .select("voter_name")
+      .eq("session_id", sid)
+      .eq("participant_name", candidateName);
+    if (!data) return;
+    const uniqueVoters = new Set(data.map((v) => v.voter_name));
+    setRoundVoteCount(uniqueVoters.size);
+  }
+
   useEffect(() => {
     return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
-      }
+      if (subscriptionRef.current) supabase.removeChannel(subscriptionRef.current);
+      if (sessionSubRef.current) supabase.removeChannel(sessionSubRef.current);
+      if (votesSubRef.current) supabase.removeChannel(votesSubRef.current);
     };
   }, []);
+
+  // When round changes or voting starts, subscribe to votes for current candidate
+  useEffect(() => {
+    if (phase === "voting" && sessionId && currentCandidate) {
+      const votersForCandidate = voterOrder.filter((p) => p !== currentCandidate);
+      // +1 for CEO
+      setTotalVoters(votersForCandidate.length + 1);
+      subscribeToVotes(sessionId, currentCandidate);
+    }
+  }, [phase, sessionId, currentRound, currentCandidate]);
 
   /* ── CEO: Start the show ── */
   async function startShow() {
@@ -717,10 +783,11 @@ export default function VibeShowdown() {
     const { data, error } = await supabase
       .from("sessions")
       .insert({
-        phase: "login",
+        phase: "voting",
         participants: people,
         presentation_order: pOrder,
         voter_order: vOrder,
+        current_round: 0,
       })
       .select()
       .single();
@@ -732,15 +799,13 @@ export default function VibeShowdown() {
     const sid = data.id;
     setSessionId(sid);
     setIsCeo(true);
+    setCurrentRound(0);
     const url = new URL(window.location);
     url.searchParams.set("s", sid);
     window.history.replaceState({}, "", url);
     subscribeToClaims(sid);
+    subscribeToSession(sid);
     setPhase("login");
-  }
-
-  function targetsFor(voter) {
-    return presentationOrder.filter((p) => p !== voter);
   }
 
   async function requestVoting(voter) {
@@ -769,104 +834,49 @@ export default function VibeShowdown() {
 
     setClaimedVoters((prev) => new Set([...prev, voter]));
     setActiveVoter(voter);
-    setCurrentScores({});
-    setScoringIdx(0);
+    setRoundScores({});
+    setMyVoteSubmitted(false);
     setPhase("voting");
   }
 
-  function setScore(participantName, catId, val) {
-    setCurrentScores((prev) => ({
-      ...prev,
-      [participantName]: {
-        ...(prev[participantName] || {}),
-        [catId]: val,
-      },
-    }));
+  function setScore(catId, val) {
+    setRoundScores((prev) => ({ ...prev, [catId]: val }));
   }
 
-  async function submitVoterScores() {
+  async function submitRoundVote() {
     const voter = activeVoter;
-    const rows = [];
-    const targets = targetsFor(voter);
-    targets.forEach((target) => {
-      const scores = currentScores[target] || {};
-      CATEGORIES.forEach((cat) => {
-        if (scores[cat.id] != null) {
-          rows.push({
-            session_id: sessionId,
-            voter_name: voter,
-            participant_name: target,
-            category_id: cat.id,
-            score: scores[cat.id],
-            is_ceo: false,
-          });
-        }
-      });
-    });
+    const candidate = currentCandidate;
+    if (!voter || !candidate) return;
 
-    const { error: voteErr } = await supabase.from("votes").upsert(rows, {
-      onConflict: "session_id,voter_name,participant_name,category_id",
-    });
-    if (voteErr) console.error("Vote write failed", voteErr);
-
-    await supabase
-      .from("claims")
-      .update({ status: "done" })
-      .eq("session_id", sessionId)
-      .eq("voter_name", voter);
-
-    setDoneVoters((prev) => new Set([...prev, voter]));
-    setActiveVoter(null);
-    setCurrentScores({});
-    setScoringIdx(0);
-
-    if (isCeo) {
-      setPhase("login");
-    } else {
-      setPhase("voter-done");
-    }
-  }
-
-  function startCeoVoting() {
-    setPhase("ceo");
-    setCeoCurrent(0);
-  }
-
-  function setCeoScore(participantName, catId, val) {
-    setCeoScores((prev) => ({
-      ...prev,
-      [participantName]: {
-        ...(prev[participantName] || {}),
-        [catId]: val,
-      },
+    const rows = CATEGORIES.map((cat) => ({
+      session_id: sessionId,
+      voter_name: voter,
+      participant_name: candidate,
+      category_id: cat.id,
+      score: roundScores[cat.id],
+      is_ceo: isCeo,
     }));
-  }
-
-  async function submitCeoVote() {
-    const rows = [];
-    participants.forEach((target) => {
-      const scores = ceoScores[target] || {};
-      CATEGORIES.forEach((cat) => {
-        if (scores[cat.id] != null) {
-          rows.push({
-            session_id: sessionId,
-            voter_name: "__CEO__",
-            participant_name: target,
-            category_id: cat.id,
-            score: scores[cat.id],
-            is_ceo: true,
-          });
-        }
-      });
-    });
 
     const { error } = await supabase.from("votes").upsert(rows, {
       onConflict: "session_id,voter_name,participant_name,category_id",
     });
-    if (error) console.error("CEO vote write failed", error);
+    if (error) console.error("Vote write failed", error);
 
-    setCeoDone(true);
-    await calculateAndReveal();
+    setMyVoteSubmitted(true);
+    setRoundScores({});
+  }
+
+  async function advanceRound() {
+    if (!sessionId) return;
+    const nextRound = currentRound + 1;
+    await supabase
+      .from("sessions")
+      .update({ current_round: nextRound })
+      .eq("id", sessionId);
+    setCurrentRound(nextRound);
+    setMyVoteSubmitted(false);
+    setRoundScores({});
+    setRoundVoteCount(0);
   }
 
   async function calculateAndReveal() {
@@ -877,36 +887,27 @@ export default function VibeShowdown() {
 
     if (!allVoteRows) return;
 
-    const teamVotes = allVoteRows.filter((v) => !v.is_ceo);
+    const ceoVoterName = activeVoter;
     const ceoVotes = allVoteRows.filter((v) => v.is_ceo);
+    const teamVotes = allVoteRows.filter((v) => !v.is_ceo);
 
     const scored = participants.map((p) => {
       const ceoForP = {};
       ceoVotes
         .filter((v) => v.participant_name === p)
-        .forEach((v) => {
-          ceoForP[v.category_id] = v.score;
-        });
-      const ceoTotal = CATEGORIES.reduce(
-        (s, c) => s + (ceoForP[c.id] || 0),
-        0
-      );
+        .forEach((v) => { ceoForP[v.category_id] = v.score; });
+      const ceoTotal = CATEGORIES.reduce((s, c) => s + (ceoForP[c.id] || 0), 0);
 
       const voterNames = [
         ...new Set(
-          teamVotes
-            .filter((v) => v.participant_name === p)
-            .map((v) => v.voter_name)
+          teamVotes.filter((v) => v.participant_name === p).map((v) => v.voter_name)
         ),
       ];
       const catMeans = CATEGORIES.map((cat) => {
         const vals = voterNames
           .map((vn) => {
             const row = teamVotes.find(
-              (v) =>
-                v.voter_name === vn &&
-                v.participant_name === p &&
-                v.category_id === cat.id
+              (v) => v.voter_name === vn && v.participant_name === p && v.category_id === cat.id
             );
             return row ? row.score : null;
           })
@@ -915,17 +916,14 @@ export default function VibeShowdown() {
         return vals.reduce((a, b) => a + b, 0) / vals.length;
       });
       const teamRaw = catMeans.reduce((a, b) => a + b, 0);
-      const total = ceoTotal + teamRaw;
 
       return {
         name: p,
         ceoTotal: Math.round(ceoTotal * 10) / 10,
         teamTotal: Math.round(teamRaw * 10) / 10,
-        total: Math.round(total * 10) / 10,
+        total: Math.round((ceoTotal + teamRaw) * 10) / 10,
         catBreakdown: CATEGORIES.map((cat, i) => ({
-          id: cat.id,
-          icon: cat.icon,
-          name: cat.name,
+          id: cat.id, icon: cat.icon, name: cat.name,
           ceo: ceoForP[cat.id] || 0,
           team: Math.round(catMeans[i] * 10) / 10,
         })),
@@ -937,20 +935,6 @@ export default function VibeShowdown() {
     setRevealingIdx(-1);
     setPhase("results");
   }
-
-  /* ── CEO alert when all votes come in via realtime ── */
-  useEffect(() => {
-    if (
-      isCeo &&
-      phase === "login" &&
-      voterOrder.length > 0 &&
-      voterOrder.every((p) => doneVoters.has(p)) &&
-      !ceoAlert &&
-      !ceoDone
-    ) {
-      setCeoAlert(true);
-    }
-  }, [doneVoters, isCeo, phase, voterOrder, ceoAlert, ceoDone]);
 
   function revealSlot(idx) {
     setRevealed((prev) => {
@@ -1012,28 +996,9 @@ export default function VibeShowdown() {
     revealOne(i);
   }
 
-  /* ── Current voting state ── */
-  const votingTargets = activeVoter ? targetsFor(activeVoter) : [];
-  const currentTarget = votingTargets[scoringIdx];
-  const currentTargetScores = currentScores[currentTarget] || {};
-  const currentTargetComplete = CATEGORIES.every(
-    (c) => currentTargetScores[c.id] != null
-  );
-  const totalCurrentScore = CATEGORIES.reduce(
-    (s, c) => s + (currentTargetScores[c.id] || 0),
-    0
-  );
-
-  const ceoTargets = participants;
-  const ceoCurrent_name = ceoTargets[ceoCurrent];
-  const ceoCurrent_scores = ceoScores[ceoCurrent_name] || {};
-  const ceoCurrent_complete = CATEGORIES.every(
-    (c) => ceoCurrent_scores[c.id] != null
-  );
-  const ceoCurrent_total = CATEGORIES.reduce(
-    (s, c) => s + (ceoCurrent_scores[c.id] || 0),
-    0
-  );
+  /* ── Current round voting state ── */
+  const roundComplete = CATEGORIES.every((c) => roundScores[c.id] != null);
+  const roundTotal = CATEGORIES.reduce((s, c) => s + (roundScores[c.id] || 0), 0);
 
   /* ─── STYLES ─────────────────────────────────────────────────── */
   const S = {
@@ -1366,278 +1331,60 @@ export default function VibeShowdown() {
     );
 
   /* ═══════════════════════════════════════════════════════════════
-     PHASE: LOGIN — Pick your name (randomized order shown)
+     PHASE: LOGIN — Claim your name
   ═══════════════════════════════════════════════════════════════ */
   if (phase === "login")
     return (
       <div style={S.root}>
-
         <StarBg />
         {showLock && pendingVoter && (
           <LockScreen voterName={pendingVoter} onUnlock={unlockAndVote} />
         )}
-
-        {/* CEO Alert — all team votes are in */}
-        {ceoAlert && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 200,
-              background: "rgba(0,0,0,0.85)",
-              backdropFilter: "blur(20px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              gap: 20,
-              animation: "slideInUp 0.5s ease",
-            }}
-          >
-            <div style={{ fontSize: 80, animation: "crownBounce 2s ease-in-out infinite" }}>👑</div>
-            <h2
-              style={{
-                color: "#FFE66D",
-                fontWeight: 900,
-                fontSize: 32,
-                fontFamily: "'Trebuchet MS', sans-serif",
-                textAlign: "center",
-                margin: 0,
-              }}
-            >
-              ALL TEAM VOTES ARE IN!
-            </h2>
-            <p
-              style={{
-                color: "rgba(255,255,255,0.6)",
-                fontSize: 18,
-                textAlign: "center",
-                maxWidth: 420,
-                lineHeight: 1.5,
-                fontFamily: "'Trebuchet MS', sans-serif",
-                margin: 0,
-              }}
-            >
-              {voterOrder.length} team members have submitted their scores.
-              <br />
-              It's your turn, Ben. The CEO Super Vote awaits.
-            </p>
-            <button
-              onClick={() => {
-                setCeoAlert(false);
-                startCeoVoting();
-              }}
-              style={{
-                background: "linear-gradient(135deg, #FFE66D, #FF6B6B)",
-                color: "#1a0533",
-                border: "none",
-                borderRadius: 14,
-                padding: "16px 48px",
-                fontWeight: 900,
-                fontSize: 20,
-                cursor: "pointer",
-                fontFamily: "'Trebuchet MS', sans-serif",
-                boxShadow: "0 8px 40px rgba(255,230,109,0.4)",
-                animation: "pulse 2s ease-in-out infinite",
-                marginTop: 8,
-              }}
-            >
-              👑 LET'S GO — Cast CEO Vote
-            </button>
-            <button
-              onClick={() => setCeoAlert(false)}
-              style={{
-                background: "none",
-                border: "none",
-                color: "rgba(255,255,255,0.3)",
-                fontSize: 14,
-                cursor: "pointer",
-                fontFamily: "'Trebuchet MS', sans-serif",
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
         <div style={S.page}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <h1 style={{ ...S.title, fontSize: 36, margin: "0 0 6px" }}>
-              🎪 WHO'S NEXT?
+              🎪 CLAIM YOUR NAME
             </h1>
-            <p
-              style={{
-                color: "rgba(255,255,255,0.5)",
-                fontSize: 15,
-                margin: 0,
-              }}
-            >
-              Tap your name to cast your confidential ballot. Voting order is
-              randomized.
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, margin: 0 }}>
+              Tap your name to join the voting session. Everyone votes on one candidate at a time.
             </p>
-            <div
-              style={{
-                marginTop: 16,
-                display: "inline-flex",
-                gap: 24,
-                background: "rgba(255,255,255,0.06)",
-                borderRadius: 14,
-                padding: "10px 20px",
-                fontSize: 14,
-              }}
-            >
-              <span style={{ color: "#4ECDC4" }}>
-                ✅ <strong>{doneVoters.size}</strong> voted
-              </span>
-              <span style={{ color: "rgba(255,255,255,0.4)" }}>
-                ⏳ <strong>{voterOrder.length - doneVoters.size}</strong>{" "}
-                pending
-              </span>
-            </div>
+            {currentCandidate && (
+              <div style={{ marginTop: 16, background: "rgba(255,230,109,0.1)", border: "1px solid rgba(255,230,109,0.3)", borderRadius: 14, padding: "10px 20px", display: "inline-block", fontSize: 14 }}>
+                <span style={{ color: "#FFE66D" }}>Now presenting: <strong>{currentCandidate}</strong> (Round {currentRound + 1} of {presentationOrder.length})</span>
+              </div>
+            )}
           </div>
 
-          {/* Voting queue */}
-          {pendingVoters.length > 0 && (
-            <div
-              style={{
-                maxWidth: 860,
-                margin: "0 auto 20px",
-                background: "rgba(78,205,196,0.06)",
-                border: "1px solid rgba(78,205,196,0.2)",
-                borderRadius: 14,
-                padding: "12px 18px",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <span
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: 1,
-                  textTransform: "uppercase",
-                }}
-              >
-                Up Next:
-              </span>
-              {pendingVoters.slice(0, 5).map((p, i) => (
-                <span
-                  key={p}
-                  style={{
-                    color: i === 0 ? "#4ECDC4" : "rgba(255,255,255,0.35)",
-                    fontWeight: i === 0 ? 800 : 400,
-                    fontSize: 14,
-                  }}
-                >
-                  {i === 0 ? "➡️ " : ""}
-                  {p}
-                  {i < Math.min(pendingVoters.length, 5) - 1 ? " → " : ""}
-                </span>
-              ))}
-              {pendingVoters.length > 5 && (
-                <span
-                  style={{
-                    color: "rgba(255,255,255,0.3)",
-                    fontSize: 13,
-                  }}
-                >
-                  +{pendingVoters.length - 5} more
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Name grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-              gap: 14,
-              maxWidth: 860,
-              margin: "0 auto",
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, maxWidth: 860, margin: "0 auto" }}>
             {voterOrder.map((p) => {
-              const done = doneVoters.has(p);
-              const claimed = claimedVoters.has(p) && !done;
-              const unavailable = done || claimed;
+              const claimed = claimedVoters.has(p);
               const i = people.indexOf(p);
               const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
               return (
-                <button
-                  key={p}
-                  onClick={() => !unavailable && requestVoting(p)}
-                  disabled={unavailable}
+                <button key={p} onClick={() => !claimed && requestVoting(p)} disabled={claimed}
                   style={{
-                    background: unavailable
-                      ? "rgba(255,255,255,0.04)"
-                      : `linear-gradient(135deg, ${color}22, ${color}11)`,
-                    border: done
-                      ? "1px solid rgba(255,255,255,0.07)"
-                      : claimed
-                        ? "2px dashed rgba(255,230,109,0.4)"
-                        : `2px solid ${color}55`,
-                    borderRadius: 18,
-                    padding: "18px 14px",
-                    cursor: unavailable ? "default" : "pointer",
-                    textAlign: "center",
-                    transition: "transform 0.15s, box-shadow 0.15s",
-                    opacity: unavailable ? 0.5 : 1,
-                    fontFamily: "inherit",
+                    background: claimed ? "rgba(255,255,255,0.04)" : `linear-gradient(135deg, ${color}22, ${color}11)`,
+                    border: claimed ? "2px dashed rgba(78,205,196,0.3)" : `2px solid ${color}55`,
+                    borderRadius: 18, padding: "18px 14px", cursor: claimed ? "default" : "pointer",
+                    textAlign: "center", transition: "transform 0.15s, box-shadow 0.15s",
+                    opacity: claimed ? 0.5 : 1, fontFamily: "inherit",
                   }}
-                  onMouseEnter={(e) => {
-                    if (!unavailable)
-                      e.currentTarget.style.transform = "translateY(-4px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseEnter={(e) => { if (!claimed) e.currentTarget.style.transform = "translateY(-4px)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
                 >
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: "50%",
-                      background: done
-                        ? "rgba(255,255,255,0.1)"
-                        : claimed
-                          ? "rgba(255,230,109,0.2)"
-                          : color,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      margin: "0 auto 10px",
-                      fontSize: 18,
-                      fontWeight: 900,
-                      color: unavailable ? "rgba(255,255,255,0.3)" : "#000",
-                      boxShadow: unavailable ? "none" : `0 4px 16px ${color}66`,
-                    }}
-                  >
-                    {done ? "✓" : claimed ? "⏳" : initials(p)}
+                  <div style={{
+                    width: 52, height: 52, borderRadius: "50%",
+                    background: claimed ? "rgba(78,205,196,0.2)" : color,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    margin: "0 auto 10px", fontSize: 18, fontWeight: 900,
+                    color: claimed ? "rgba(255,255,255,0.3)" : "#000",
+                    boxShadow: claimed ? "none" : `0 4px 16px ${color}66`,
+                  }}>
+                    {claimed ? "✓" : initials(p)}
                   </div>
-                  <div
-                    style={{
-                      color: unavailable ? "rgba(255,255,255,0.3)" : "#fff",
-                      fontWeight: 700,
-                      fontSize: 14,
-                    }}
-                  >
-                    {p}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: done
-                        ? "#4ECDC4"
-                        : claimed
-                          ? "#FFE66D"
-                          : "rgba(255,255,255,0.35)",
-                      marginTop: 4,
-                    }}
-                  >
-                    {done ? "Voted ✅" : claimed ? "Voting... ⏳" : "🔒 Tap to vote"}
+                  <div style={{ color: claimed ? "rgba(255,255,255,0.3)" : "#fff", fontWeight: 700, fontSize: 14 }}>{p}</div>
+                  <div style={{ fontSize: 11, color: claimed ? "#4ECDC4" : "rgba(255,255,255,0.35)", marginTop: 4 }}>
+                    {claimed ? "Joined ✅" : "🔒 Tap to join"}
                   </div>
                 </button>
               );
@@ -1646,958 +1393,191 @@ export default function VibeShowdown() {
 
           {/* Share link (CEO only) */}
           {isCeo && sessionId && (
-            <div
-              style={{
-                maxWidth: 860,
-                margin: "20px auto",
-                ...S.card("rgba(78,205,196,0.06)"),
-                border: "1px solid rgba(78,205,196,0.2)",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <span style={{ color: "#4ECDC4", fontWeight: 700, fontSize: 14 }}>
-                📎 Share this link with voters:
-              </span>
-              <code
-                style={{
-                  flex: 1,
-                  background: "rgba(0,0,0,0.3)",
-                  borderRadius: 8,
-                  padding: "8px 12px",
-                  color: "#fff",
-                  fontSize: 13,
-                  wordBreak: "break-all",
-                  cursor: "pointer",
-                }}
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                }}
-                title="Click to copy"
-              >
+            <div style={{ maxWidth: 860, margin: "20px auto", ...S.card("rgba(78,205,196,0.06)"), border: "1px solid rgba(78,205,196,0.2)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ color: "#4ECDC4", fontWeight: 700, fontSize: 14 }}>📎 Share this link with voters:</span>
+              <code style={{ flex: 1, background: "rgba(0,0,0,0.3)", borderRadius: 8, padding: "8px 12px", color: "#fff", fontSize: 13, wordBreak: "break-all", cursor: "pointer" }}
+                onClick={() => navigator.clipboard.writeText(window.location.href)} title="Click to copy">
                 {window.location.href}
               </code>
-              <button
-                onClick={() => navigator.clipboard.writeText(window.location.href)}
-                style={{
-                  ...S.btn("rgba(78,205,196,0.3)", "#fff"),
-                  padding: "8px 16px",
-                  fontSize: 13,
-                }}
-              >
-                Copy
-              </button>
+              <button onClick={() => navigator.clipboard.writeText(window.location.href)}
+                style={{ ...S.btn("rgba(78,205,196,0.3)", "#fff"), padding: "8px 16px", fontSize: 13 }}>Copy</button>
             </div>
-          )}
-
-          {/* Ben / CEO section (CEO only) */}
-          {isCeo && (
-          <div
-            style={{
-              maxWidth: 860,
-              margin: "8px auto 0",
-              ...S.card("rgba(255,230,109,0.08)"),
-              border: "1px solid rgba(255,230,109,0.3)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 16,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                }}
-              >
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background:
-                      "linear-gradient(135deg, #FFE66D, #FF6B6B)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 22,
-                    fontWeight: 900,
-                    color: "#000",
-                  }}
-                >
-                  BS
-                </div>
-                <div>
-                  <div
-                    style={{
-                      color: "#FFE66D",
-                      fontWeight: 900,
-                      fontSize: 18,
-                    }}
-                  >
-                    Ben Stern — CEO 👑
-                  </div>
-                  <div
-                    style={{
-                      color: "rgba(255,255,255,0.5)",
-                      fontSize: 13,
-                    }}
-                  >
-                    {allVotesSubmitted
-                      ? "All team votes are in. Time for the CEO vote! 🔥"
-                      : `Waiting for ${voterOrder.length - doneVoters.size} more voter${voterOrder.length - doneVoters.size !== 1 ? "s" : ""}...`}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={startCeoVoting}
-                disabled={!allVotesSubmitted}
-                style={{
-                  ...S.btn(
-                    allVotesSubmitted
-                      ? "linear-gradient(135deg, #FFE66D, #FF6B6B)"
-                      : "rgba(255,255,255,0.1)",
-                    allVotesSubmitted ? "#1a0533" : "rgba(255,255,255,0.3)"
-                  ),
-                  opacity: allVotesSubmitted ? 1 : 0.5,
-                  cursor: allVotesSubmitted ? "pointer" : "not-allowed",
-                }}
-              >
-                {ceoDone ? "✅ Voted" : "👑 Cast CEO Vote"}
-              </button>
-            </div>
-          </div>
           )}
         </div>
       </div>
     );
 
   /* ═══════════════════════════════════════════════════════════════
-     PHASE: VOTING (regular voter)
+     PHASE: VOTING — One candidate at a time, everyone votes together
   ═══════════════════════════════════════════════════════════════ */
-  if (phase === "voting") {
-    const voterColor =
-      AVATAR_COLORS[people.indexOf(activeVoter) % AVATAR_COLORS.length];
-    const targetColor =
-      AVATAR_COLORS[people.indexOf(currentTarget) % AVATAR_COLORS.length];
+  if (phase === "voting" && currentCandidate) {
+    const candidateColor = AVATAR_COLORS[people.indexOf(currentCandidate) % AVATAR_COLORS.length];
+    const voterColor = activeVoter ? AVATAR_COLORS[people.indexOf(activeVoter) % AVATAR_COLORS.length] : "#888";
+    const isSelf = activeVoter === currentCandidate;
+
+    if (isSelf || myVoteSubmitted) {
+      return (
+        <div style={S.root}>
+          <StarBg />
+          <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "80vh", flexDirection: "column", gap: 20, textAlign: "center" }}>
+            <div style={{ fontSize: 64, animation: "crownBounce 2s ease-in-out infinite", display: "inline-block" }}>
+              {isSelf ? "🙈" : "✅"}
+            </div>
+            <h2 style={{ ...S.title, fontSize: 28, margin: 0 }}>
+              {isSelf ? "This is YOUR app!" : "Vote Submitted!"}
+            </h2>
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 16, maxWidth: 400, lineHeight: 1.5, margin: 0 }}>
+              {isSelf
+                ? "You can't vote on your own app. Sit tight while everyone else votes."
+                : "Your scores are locked in. Waiting for everyone else..."}
+            </p>
+
+            {/* Progress bar */}
+            <div style={{ width: 300, background: "rgba(255,255,255,0.1)", borderRadius: 12, height: 8, marginTop: 8, overflow: "hidden" }}>
+              <div style={{ width: `${totalVoters > 0 ? (roundVoteCount / totalVoters) * 100 : 0}%`, height: "100%", background: "linear-gradient(90deg, #4ECDC4, #45B7D1)", borderRadius: 12, transition: "width 0.5s ease" }} />
+            </div>
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>
+              {roundVoteCount} of {totalVoters} voted
+            </span>
+
+            {/* CEO controls */}
+            {isCeo && allRoundVotesIn && (
+              <div style={{ marginTop: 16, ...S.card("rgba(255,230,109,0.1)"), border: "1px solid rgba(255,230,109,0.3)", textAlign: "center", maxWidth: 420 }}>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#FFE66D", marginBottom: 8 }}>All votes are in!</div>
+                <button
+                  onClick={isLastRound ? calculateAndReveal : advanceRound}
+                  style={{ ...S.btn(), fontSize: 18, padding: "14px 40px", animation: "pulse 2s ease-in-out infinite" }}
+                >
+                  {isLastRound ? "🎪 See Results!" : `➡️ Next: ${presentationOrder[currentRound + 1]}`}
+                </button>
+              </div>
+            )}
+
+            <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 13, marginTop: 8 }}>
+              Round {currentRound + 1} of {presentationOrder.length} · Now voting on: {currentCandidate}
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div style={S.root}>
-
         <StarBg />
         <div style={S.page}>
           {/* Top bar */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 24,
-              flexWrap: "wrap",
-              gap: 12,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  background: voterColor,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 14,
-                  fontWeight: 900,
-                  color: "#000",
-                }}
-              >
-                {initials(activeVoter)}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: voterColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#000" }}>
+                {activeVoter ? initials(activeVoter) : "?"}
               </div>
               <div>
-                <div
-                  style={{ color: "#fff", fontWeight: 800, fontSize: 16 }}
-                >
-                  {activeVoter}
-                </div>
-                <div
-                  style={{
-                    color: "rgba(255,255,255,0.4)",
-                    fontSize: 12,
-                  }}
-                >
-                  Rating {scoringIdx + 1} of {votingTargets.length} · 🔒
-                  Confidential
+                <div style={{ color: "#fff", fontWeight: 800, fontSize: 16 }}>{activeVoter}{isCeo ? " 👑" : ""}</div>
+                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
+                  Round {currentRound + 1} of {presentationOrder.length} · 🔒 Confidential
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {votingTargets.map((t, i) => {
-                const done =
-                  currentScores[t] &&
-                  CATEGORIES.every((c) => currentScores[t][c.id] != null);
-                return (
-                  <div
-                    key={t}
-                    onClick={() => setScoringIdx(i)}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: "50%",
-                      cursor: "pointer",
-                      background:
-                        i === scoringIdx
-                          ? AVATAR_COLORS[
-                              people.indexOf(t) % AVATAR_COLORS.length
-                            ]
-                          : done
-                            ? "rgba(78,205,196,0.5)"
-                            : "rgba(255,255,255,0.1)",
-                      border:
-                        i === scoringIdx
-                          ? "2px solid #fff"
-                          : "1px solid rgba(255,255,255,0.15)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 9,
-                      fontWeight: 900,
-                      color:
-                        i === scoringIdx
-                          ? "#000"
-                          : "rgba(255,255,255,0.6)",
-                      transition: "all 0.2s",
-                    }}
-                    title={t}
-                  >
-                    {done && i !== scoringIdx ? "✓" : initials(t)}
-                  </div>
-                );
-              })}
+            {/* Round progress dots */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {presentationOrder.map((p, i) => (
+                <div key={p} style={{
+                  width: 20, height: 20, borderRadius: "50%",
+                  background: i === currentRound ? candidateColor : i < currentRound ? "rgba(78,205,196,0.5)" : "rgba(255,255,255,0.1)",
+                  border: i === currentRound ? "2px solid #fff" : "1px solid rgba(255,255,255,0.1)",
+                  fontSize: 7, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center",
+                  color: i === currentRound ? "#000" : "rgba(255,255,255,0.4)",
+                }} title={p}>{i < currentRound ? "✓" : i + 1}</div>
+              ))}
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 360px",
-              gap: 24,
-              alignItems: "start",
-            }}
-          >
+          {/* CEO live vote count */}
+          {isCeo && (
+            <div style={{ marginBottom: 20, background: "rgba(255,230,109,0.08)", border: "1px solid rgba(255,230,109,0.2)", borderRadius: 14, padding: "10px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <span style={{ color: "#FFE66D", fontWeight: 700, fontSize: 14 }}>
+                🗳️ Live: {roundVoteCount} of {totalVoters} voted
+              </span>
+              <div style={{ width: 200, background: "rgba(255,255,255,0.1)", borderRadius: 8, height: 6, overflow: "hidden" }}>
+                <div style={{ width: `${totalVoters > 0 ? (roundVoteCount / totalVoters) * 100 : 0}%`, height: "100%", background: allRoundVotesIn ? "#4ECDC4" : "#FFE66D", borderRadius: 8, transition: "width 0.5s ease" }} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 24, alignItems: "start" }}>
             {/* LEFT: Scoring card */}
             <div style={S.card()}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                  marginBottom: 28,
-                  paddingBottom: 20,
-                  borderBottom: "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
-                <div
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: "50%",
-                    background: targetColor,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 22,
-                    fontWeight: 900,
-                    color: "#000",
-                    boxShadow: `0 6px 24px ${targetColor}55`,
-                    flexShrink: 0,
-                  }}
-                >
-                  {initials(currentTarget)}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: candidateColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#000", boxShadow: `0 6px 24px ${candidateColor}55`, flexShrink: 0 }}>
+                  {initials(currentCandidate)}
                 </div>
                 <div>
-                  <div
-                    style={{
-                      color: "rgba(255,255,255,0.4)",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      letterSpacing: 1.5,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Now Rating
-                  </div>
-                  <div
-                    style={{
-                      color: "#fff",
-                      fontWeight: 900,
-                      fontSize: 26,
-                      lineHeight: 1.1,
-                    }}
-                  >
-                    {currentTarget}
-                  </div>
+                  <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>Now Rating</div>
+                  <div style={{ color: "#fff", fontWeight: 900, fontSize: 26, lineHeight: 1.1 }}>{currentCandidate}</div>
                 </div>
                 <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                  <div
-                    style={{
-                      color: "rgba(255,255,255,0.3)",
-                      fontSize: 12,
-                    }}
-                  >
-                    Your score
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 36,
-                      fontWeight: 900,
-                      color:
-                        totalCurrentScore >= 20
-                          ? "#4ECDC4"
-                          : totalCurrentScore >= 12
-                            ? "#FFE66D"
-                            : "#FF6B6B",
-                    }}
-                  >
-                    {totalCurrentScore}
-                    <span
-                      style={{
-                        fontSize: 16,
-                        color: "rgba(255,255,255,0.3)",
-                        fontWeight: 400,
-                      }}
-                    >
-                      /25
-                    </span>
+                  <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12 }}>Your score</div>
+                  <div style={{ fontSize: 36, fontWeight: 900, color: roundTotal >= 20 ? "#4ECDC4" : roundTotal >= 12 ? "#FFE66D" : "#FF6B6B" }}>
+                    {roundTotal}<span style={{ fontSize: 16, color: "rgba(255,255,255,0.3)", fontWeight: 400 }}>/25</span>
                   </div>
                 </div>
               </div>
 
               {CATEGORIES.map((cat) => {
-                const val = currentTargetScores[cat.id];
+                const val = roundScores[cat.id];
                 return (
                   <div key={cat.id} style={{ marginBottom: 24 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 10,
-                      }}
-                    >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                       <div>
-                        <span style={{ fontSize: 18, marginRight: 8 }}>
-                          {cat.icon}
-                        </span>
-                        <strong style={{ color: "#fff", fontSize: 15 }}>
-                          {cat.name}
-                        </strong>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "rgba(255,255,255,0.4)",
-                            marginTop: 2,
-                          }}
-                        >
-                          {cat.desc}
-                        </div>
+                        <span style={{ fontSize: 18, marginRight: 8 }}>{cat.icon}</span>
+                        <strong style={{ color: "#fff", fontSize: 15 }}>{cat.name}</strong>
+                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>{cat.desc}</div>
                       </div>
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 12,
-                          flexShrink: 0,
-                          background: val
-                            ? `linear-gradient(135deg, ${AVATAR_COLORS[((val - 1) * 4) % AVATAR_COLORS.length]}, ${AVATAR_COLORS[(val * 3) % AVATAR_COLORS.length]})`
-                            : "rgba(255,255,255,0.1)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 22,
-                          fontWeight: 900,
-                          color: val ? "#000" : "rgba(255,255,255,0.2)",
-                          border: val
-                            ? "none"
-                            : "1px solid rgba(255,255,255,0.15)",
-                        }}
-                      >
-                        {val ?? "?"}
-                      </div>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                        background: val ? `linear-gradient(135deg, ${AVATAR_COLORS[((val - 1) * 4) % AVATAR_COLORS.length]}, ${AVATAR_COLORS[(val * 3) % AVATAR_COLORS.length]})` : "rgba(255,255,255,0.1)",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900,
+                        color: val ? "#000" : "rgba(255,255,255,0.2)", border: val ? "none" : "1px solid rgba(255,255,255,0.15)",
+                      }}>{val ?? "?"}</div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       {[1, 2, 3, 4, 5].map((n) => (
-                        <button
-                          key={n}
-                          onClick={() => setScore(currentTarget, cat.id, n)}
-                          style={{
-                            flex: 1,
-                            height: 48,
-                            borderRadius: 12,
-                            border: "none",
-                            cursor: "pointer",
-                            fontWeight: 900,
-                            fontSize: 16,
-                            fontFamily: "inherit",
-                            background:
-                              val >= n
-                                ? `linear-gradient(135deg, ${AVATAR_COLORS[((val - 1) * 4) % AVATAR_COLORS.length]}, ${AVATAR_COLORS[(val * 3) % AVATAR_COLORS.length]})`
-                                : "rgba(255,255,255,0.07)",
-                            color:
-                              val >= n
-                                ? "#000"
-                                : "rgba(255,255,255,0.3)",
-                            transition: "all 0.15s",
-                            transform:
-                              val === n ? "scale(1.08)" : "scale(1)",
-                            boxShadow:
-                              val === n
-                                ? "0 4px 16px rgba(0,0,0,0.3)"
-                                : "none",
-                          }}
-                        >
-                          {n}
-                        </button>
+                        <button key={n} onClick={() => setScore(cat.id, n)} style={{
+                          flex: 1, height: 48, borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 900, fontSize: 16, fontFamily: "inherit",
+                          background: val >= n ? `linear-gradient(135deg, ${AVATAR_COLORS[((val - 1) * 4) % AVATAR_COLORS.length]}, ${AVATAR_COLORS[(val * 3) % AVATAR_COLORS.length]})` : "rgba(255,255,255,0.07)",
+                          color: val >= n ? "#000" : "rgba(255,255,255,0.3)", transition: "all 0.15s",
+                          transform: val === n ? "scale(1.08)" : "scale(1)", boxShadow: val === n ? "0 4px 16px rgba(0,0,0,0.3)" : "none",
+                        }}>{n}</button>
                       ))}
                     </div>
                   </div>
                 );
               })}
 
-              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                {scoringIdx > 0 && (
-                  <button
-                    onClick={() => setScoringIdx((i) => i - 1)}
-                    style={{
-                      ...S.btn("rgba(255,255,255,0.1)", "#fff"),
-                      flex: "0 0 auto",
-                      padding: "14px 20px",
-                    }}
-                  >
-                    ← Back
-                  </button>
-                )}
-                {scoringIdx < votingTargets.length - 1 ? (
-                  <button
-                    onClick={() => {
-                      if (currentTargetComplete)
-                        setScoringIdx((i) => i + 1);
-                    }}
-                    disabled={!currentTargetComplete}
-                    style={{
-                      ...S.btn(
-                        currentTargetComplete
-                          ? "linear-gradient(135deg, #4ECDC4, #45B7D1)"
-                          : "rgba(255,255,255,0.1)",
-                        currentTargetComplete
-                          ? "#000"
-                          : "rgba(255,255,255,0.3)"
-                      ),
-                      flex: 1,
-                      opacity: currentTargetComplete ? 1 : 0.5,
-                      cursor: currentTargetComplete
-                        ? "pointer"
-                        : "not-allowed",
-                    }}
-                  >
-                    Next App →
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      const allDone = votingTargets.every((t) => {
-                        const s = currentScores[t] || {};
-                        return CATEGORIES.every(
-                          (c) => s[c.id] != null
-                        );
-                      });
-                      if (allDone) submitVoterScores();
-                      else
-                        alert(
-                          "Please score all apps before submitting!"
-                        );
-                    }}
-                    style={{ ...S.btn(), flex: 1 }}
-                  >
-                    ✅ Submit All Scores
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={() => { if (roundComplete) submitRoundVote(); }}
+                disabled={!roundComplete}
+                style={{
+                  ...S.btn(roundComplete ? "linear-gradient(135deg, #4ECDC4, #45B7D1)" : "rgba(255,255,255,0.1)", roundComplete ? "#000" : "rgba(255,255,255,0.3)"),
+                  width: "100%", marginTop: 8, opacity: roundComplete ? 1 : 0.5, cursor: roundComplete ? "pointer" : "not-allowed",
+                }}
+              >
+                ✅ Submit Vote for {currentCandidate}
+              </button>
             </div>
 
             {/* RIGHT: Rubric sidebar */}
             <div style={{ position: "sticky", top: 24 }}>
               <div style={S.card("rgba(255,255,255,0.05)")}>
                 <span style={S.label}>📋 Scoring Guide</span>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 16,
-                  }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {CATEGORIES.map((cat, ci) => (
-                    <div
-                      key={cat.id}
-                      style={{
-                        borderLeft: `3px solid ${AVATAR_COLORS[(ci * 4) % AVATAR_COLORS.length]}`,
-                        paddingLeft: 12,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontWeight: 800,
-                          color: "#fff",
-                          fontSize: 14,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {cat.icon} {cat.name}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "rgba(255,255,255,0.5)",
-                          marginBottom: 8,
-                        }}
-                      >
-                        {cat.guide}
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 3,
-                        }}
-                      >
+                    <div key={cat.id} style={{ borderLeft: `3px solid ${AVATAR_COLORS[(ci * 4) % AVATAR_COLORS.length]}`, paddingLeft: 12 }}>
+                      <div style={{ fontWeight: 800, color: "#fff", fontSize: 14, marginBottom: 4 }}>{cat.icon} {cat.name}</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>{cat.guide}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                         {cat.rubric.map((r, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              fontSize: 11,
-                              color: "rgba(255,255,255,0.35)",
-                              lineHeight: 1.4,
-                            }}
-                          >
-                            {r}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ═══════════════════════════════════════════════════════════════
-     PHASE: CEO VOTING
-  ═══════════════════════════════════════════════════════════════ */
-  if (phase === "ceo") {
-    const targetColor =
-      AVATAR_COLORS[people.indexOf(ceoCurrent_name) % AVATAR_COLORS.length];
-
-    return (
-      <div style={S.root}>
-
-        <StarBg />
-        <div style={S.page}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div
-              style={{
-                fontSize: 48,
-                marginBottom: 4,
-                animation: "crownBounce 2s ease-in-out infinite",
-                display: "inline-block",
-              }}
-            >
-              👑
-            </div>
-            <h2 style={{ ...S.title, fontSize: 30, margin: 0 }}>
-              CEO SUPER VOTE
-            </h2>
-            <p
-              style={{
-                color: "rgba(255,255,255,0.4)",
-                fontSize: 14,
-                margin: "6px 0 0",
-              }}
-            >
-              Ben Stern · Rating {ceoCurrent + 1} of {ceoTargets.length}
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: 6,
-              justifyContent: "center",
-              marginBottom: 28,
-              flexWrap: "wrap",
-            }}
-          >
-            {ceoTargets.map((t, i) => {
-              const done =
-                ceoScores[t] &&
-                CATEGORIES.every((c) => ceoScores[t][c.id] != null);
-              return (
-                <div
-                  key={t}
-                  onClick={() => setCeoCurrent(i)}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: "50%",
-                    cursor: "pointer",
-                    background:
-                      i === ceoCurrent
-                        ? AVATAR_COLORS[
-                            people.indexOf(t) % AVATAR_COLORS.length
-                          ]
-                        : done
-                          ? "rgba(78,205,196,0.5)"
-                          : "rgba(255,255,255,0.1)",
-                    border:
-                      i === ceoCurrent
-                        ? "2px solid #FFE66D"
-                        : "1px solid rgba(255,255,255,0.1)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 9,
-                    fontWeight: 900,
-                    color:
-                      i === ceoCurrent
-                        ? "#000"
-                        : "rgba(255,255,255,0.6)",
-                    transition: "all 0.2s",
-                  }}
-                  title={t}
-                >
-                  {done && i !== ceoCurrent ? "✓" : initials(t)}
-                </div>
-              );
-            })}
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 360px",
-              gap: 24,
-              alignItems: "start",
-            }}
-          >
-            <div
-              style={{
-                ...S.card("rgba(255,230,109,0.06)"),
-                border: "1px solid rgba(255,230,109,0.25)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                  marginBottom: 28,
-                  paddingBottom: 20,
-                  borderBottom: "1px solid rgba(255,230,109,0.15)",
-                }}
-              >
-                <div
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: "50%",
-                    background: targetColor,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 22,
-                    fontWeight: 900,
-                    color: "#000",
-                    boxShadow: `0 6px 24px ${targetColor}55`,
-                    flexShrink: 0,
-                  }}
-                >
-                  {initials(ceoCurrent_name)}
-                </div>
-                <div>
-                  <div
-                    style={{
-                      color: "rgba(255,230,109,0.6)",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: 1.5,
-                    }}
-                  >
-                    CEO Rating
-                  </div>
-                  <div
-                    style={{
-                      color: "#fff",
-                      fontWeight: 900,
-                      fontSize: 26,
-                    }}
-                  >
-                    {ceoCurrent_name}
-                  </div>
-                </div>
-                <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                  <div
-                    style={{
-                      color: "rgba(255,255,255,0.3)",
-                      fontSize: 12,
-                    }}
-                  >
-                    CEO score
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 36,
-                      fontWeight: 900,
-                      color: "#FFE66D",
-                    }}
-                  >
-                    {ceoCurrent_total}
-                    <span
-                      style={{
-                        fontSize: 16,
-                        color: "rgba(255,255,255,0.3)",
-                        fontWeight: 400,
-                      }}
-                    >
-                      /25
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {CATEGORIES.map((cat) => {
-                const val = ceoCurrent_scores[cat.id];
-                return (
-                  <div key={cat.id} style={{ marginBottom: 24 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 10,
-                      }}
-                    >
-                      <div>
-                        <span style={{ fontSize: 18, marginRight: 8 }}>
-                          {cat.icon}
-                        </span>
-                        <strong style={{ color: "#fff", fontSize: 15 }}>
-                          {cat.name}
-                        </strong>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "rgba(255,255,255,0.4)",
-                            marginTop: 2,
-                          }}
-                        >
-                          {cat.desc}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 12,
-                          flexShrink: 0,
-                          background: val
-                            ? "linear-gradient(135deg, #FFE66D, #FF6B6B)"
-                            : "rgba(255,255,255,0.1)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 22,
-                          fontWeight: 900,
-                          color: val ? "#000" : "rgba(255,255,255,0.2)",
-                          border: val
-                            ? "none"
-                            : "1px solid rgba(255,255,255,0.15)",
-                        }}
-                      >
-                        {val ?? "?"}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <button
-                          key={n}
-                          onClick={() =>
-                            setCeoScore(ceoCurrent_name, cat.id, n)
-                          }
-                          style={{
-                            flex: 1,
-                            height: 48,
-                            borderRadius: 12,
-                            border: "none",
-                            cursor: "pointer",
-                            fontWeight: 900,
-                            fontSize: 16,
-                            fontFamily: "inherit",
-                            background:
-                              val >= n
-                                ? "linear-gradient(135deg, #FFE66D, #FF6B6B)"
-                                : "rgba(255,255,255,0.07)",
-                            color:
-                              val >= n
-                                ? "#000"
-                                : "rgba(255,255,255,0.3)",
-                            transition: "all 0.15s",
-                            transform:
-                              val === n ? "scale(1.08)" : "scale(1)",
-                          }}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                {ceoCurrent > 0 && (
-                  <button
-                    onClick={() => setCeoCurrent((i) => i - 1)}
-                    style={{
-                      ...S.btn("rgba(255,255,255,0.1)", "#fff"),
-                      flex: "0 0 auto",
-                      padding: "14px 20px",
-                    }}
-                  >
-                    ← Back
-                  </button>
-                )}
-                {ceoCurrent < ceoTargets.length - 1 ? (
-                  <button
-                    onClick={() => {
-                      if (ceoCurrent_complete)
-                        setCeoCurrent((i) => i + 1);
-                    }}
-                    disabled={!ceoCurrent_complete}
-                    style={{
-                      ...S.btn(
-                        "linear-gradient(135deg, #FFE66D, #FF6B6B)"
-                      ),
-                      flex: 1,
-                      opacity: ceoCurrent_complete ? 1 : 0.5,
-                      cursor: ceoCurrent_complete
-                        ? "pointer"
-                        : "not-allowed",
-                    }}
-                  >
-                    Next App →
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      const allDone = ceoTargets.every((t) => {
-                        const s = ceoScores[t] || {};
-                        return CATEGORIES.every(
-                          (c) => s[c.id] != null
-                        );
-                      });
-                      if (allDone) submitCeoVote();
-                      else
-                        alert(
-                          "Please score all apps before submitting!"
-                        );
-                    }}
-                    style={{
-                      ...S.btn(
-                        "linear-gradient(135deg, #FFE66D, #FF6B6B)"
-                      ),
-                      flex: 1,
-                    }}
-                  >
-                    👑 Submit CEO Vote & See Results
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Rubric sidebar */}
-            <div style={{ position: "sticky", top: 24 }}>
-              <div style={S.card("rgba(255,230,109,0.04)")}>
-                <span style={S.label}>📋 Scoring Guide</span>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 16,
-                  }}
-                >
-                  {CATEGORIES.map((cat) => (
-                    <div
-                      key={cat.id}
-                      style={{
-                        borderLeft:
-                          "3px solid rgba(255,230,109,0.4)",
-                        paddingLeft: 12,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontWeight: 800,
-                          color: "#FFE66D",
-                          fontSize: 14,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {cat.icon} {cat.name}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "rgba(255,255,255,0.5)",
-                          marginBottom: 8,
-                        }}
-                      >
-                        {cat.guide}
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 3,
-                        }}
-                      >
-                        {cat.rubric.map((r, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              fontSize: 11,
-                              color: "rgba(255,255,255,0.35)",
-                            }}
-                          >
-                            {r}
-                          </div>
+                          <div key={i} style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>{r}</div>
                         ))}
                       </div>
                     </div>
@@ -3175,21 +2155,21 @@ export default function VibeShowdown() {
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <button
                 onClick={() => {
-                  if (subscriptionRef.current) {
-                    supabase.removeChannel(subscriptionRef.current);
-                  }
+                  if (subscriptionRef.current) supabase.removeChannel(subscriptionRef.current);
+                  if (sessionSubRef.current) supabase.removeChannel(sessionSubRef.current);
+                  if (votesSubRef.current) supabase.removeChannel(votesSubRef.current);
                   setSessionId(null);
                   setIsCeo(true);
                   const url = new URL(window.location);
                   url.searchParams.delete("s");
                   window.history.replaceState({}, "", url);
                   setPhase("setup");
-                  setAllVotes({});
                   setDoneVoters(new Set());
                   setClaimedVoters(new Set());
-                  setCeoScores({});
-                  setCeoDone(false);
-                  setCeoAlert(false);
+                  setCurrentRound(0);
+                  setRoundScores({});
+                  setMyVoteSubmitted(false);
+                  setRoundVoteCount(0);
                   setResults([]);
                   setRevealed([]);
                   setAllRevealed(false);

@@ -12,7 +12,8 @@ create table if not exists sessions (
   phase text not null default 'login',
   participants text[] not null default '{}',
   presentation_order text[] not null default '{}',
-  voter_order text[] not null default '{}'
+  voter_order text[] not null default '{}',
+  current_round int not null default 0
 );
 
 -- 2. Claims (who has tapped their name / finished voting)
@@ -65,3 +66,5 @@ create policy "votes_insert" on votes for insert with check (true);
 -- (also do this in Dashboard > Database > Replication)
 -- ============================================================
 alter publication supabase_realtime add table claims;
+alter publication supabase_realtime add table sessions;
+alter publication supabase_realtime add table votes;
