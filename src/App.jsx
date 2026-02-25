@@ -1035,7 +1035,11 @@ export default function VibeShowdown() {
     setActiveVoter(voter);
     setRoundScores({});
     setMyVoteSubmitted(false);
-    setPhase("voting");
+    // Only go to voting if presentation order is already set (late joiner scenario)
+    // Otherwise stay on login — the useEffect auto-transitions when order is ready
+    if (presentationOrder.length > 0) {
+      setPhase("voting");
+    }
   }
 
   function setScore(catId, val) {
@@ -1534,7 +1538,8 @@ export default function VibeShowdown() {
   ═══════════════════════════════════════════════════════════════ */
   if (phase === "login") {
     const claimedCount = claimedVoters.size;
-    const canLock = isCeo && claimedCount >= 2 && !sessionLocked;
+    const ceoHasClaimed = isCeo && activeVoter != null;
+    const canLock = ceoHasClaimed && claimedCount >= 2 && !sessionLocked;
 
     return (
       <div style={S.root}>
@@ -1610,6 +1615,15 @@ export default function VibeShowdown() {
               </code>
               <button onClick={() => navigator.clipboard.writeText(window.location.href)}
                 style={{ ...S.btn("rgba(78,205,196,0.3)", "#fff"), padding: "8px 16px", fontSize: 13 }}>Copy</button>
+            </div>
+          )}
+
+          {/* CEO hint to claim first */}
+          {isCeo && !activeVoter && !sessionLocked && (
+            <div style={{ textAlign: "center", marginTop: 20 }}>
+              <p style={{ color: "#FFE66D", fontSize: 14, fontWeight: 700 }}>
+                👆 Claim your own name first, then you can lock names & spin the wheel.
+              </p>
             </div>
           )}
 
