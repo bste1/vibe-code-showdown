@@ -13,7 +13,8 @@ create table if not exists sessions (
   participants text[] not null default '{}',
   presentation_order text[] not null default '{}',
   voter_order text[] not null default '{}',
-  current_round int not null default 0
+  current_round int not null default 0,
+  locked boolean not null default false
 );
 
 -- 2. Claims (who has tapped their name / finished voting)

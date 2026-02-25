@@ -580,6 +580,179 @@ function ScratchCard({ width, height, onComplete, children }) {
   );
 }
 
+/* ─── SPIN WHEEL ─────────────────────────────────────────────── */
+function SpinWheel({ names, onComplete }) {
+  const canvasRef = useRef(null);
+  const [orderedNames, setOrderedNames] = useState([]);
+  const [remaining, setRemaining] = useState(names);
+  const [spinning, setSpinning] = useState(false);
+  const [currentAngle, setCurrentAngle] = useState(0);
+  const [selectedName, setSelectedName] = useState(null);
+  const [done, setDone] = useState(false);
+  const angleRef = useRef(0);
+  const animRef = useRef(null);
+
+  const colors = [
+    "#FF6B6B", "#4ECDC4", "#FFE66D", "#45B7D1", "#96CEB4",
+    "#DDA0DD", "#F7DC6F", "#BB8FCE", "#82E0AA", "#F0B27A",
+    "#85C1E9", "#F1948A", "#A8DFEB", "#FAD7A0", "#98D8C8",
+    "#D2B4DE", "#A9DFBF", "#AED6F1", "#F9E79F", "#FFEAA7",
+  ];
+
+  useEffect(() => {
+    if (remaining.length > 0 && !spinning && !selectedName) {
+      const timer = setTimeout(() => spinOnce(), orderedNames.length === 0 ? 500 : 1200);
+      return () => clearTimeout(timer);
+    }
+    if (remaining.length === 0 && !spinning && !done) {
+      setDone(true);
+      setTimeout(() => onComplete(orderedNames), 1500);
+    }
+  }, [remaining, spinning, selectedName, orderedNames, done]);
+
+  function drawWheel(ctx, w, h, items, angle) {
+    const cx = w / 2, cy = h / 2, r = Math.min(cx, cy) - 20;
+    ctx.clearRect(0, 0, w, h);
+
+    if (items.length === 0) return;
+    const sliceAngle = (2 * Math.PI) / items.length;
+
+    items.forEach((name, i) => {
+      const start = angle + i * sliceAngle;
+      const end = start + sliceAngle;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, start, end);
+      ctx.closePath();
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.3)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(start + sliceAngle / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#000";
+      ctx.font = `bold ${Math.min(16, 200 / items.length)}px Trebuchet MS`;
+      ctx.fillText(name, r - 14, 5);
+      ctx.restore();
+    });
+
+    // pointer
+    ctx.beginPath();
+    ctx.moveTo(cx + r + 5, cy);
+    ctx.lineTo(cx + r + 25, cy - 12);
+    ctx.lineTo(cx + r + 25, cy + 12);
+    ctx.closePath();
+    ctx.fillStyle = "#FFE66D";
+    ctx.fill();
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function spinOnce() {
+    if (remaining.length === 0) return;
+    setSpinning(true);
+    setSelectedName(null);
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+
+    const totalSpins = 3 + Math.random() * 3;
+    const targetAngle = angleRef.current + totalSpins * 2 * Math.PI + Math.random() * 2 * Math.PI;
+    const duration = 2500 + Math.random() * 1000;
+    const startTime = Date.now();
+    const startAngle = angleRef.current;
+
+    function animate() {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      const angle = startAngle + (targetAngle - startAngle) * ease;
+      angleRef.current = angle;
+
+      drawWheel(ctx, w, h, remaining, angle);
+
+      if (t < 1) {
+        animRef.current = requestAnimationFrame(animate);
+      } else {
+        const sliceAngle = (2 * Math.PI) / remaining.length;
+        const normalizedAngle = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        const pointerAngle = (2 * Math.PI - normalizedAngle) % (2 * Math.PI);
+        const idx = Math.floor(pointerAngle / sliceAngle) % remaining.length;
+        const picked = remaining[idx];
+
+        setSelectedName(picked);
+        setSpinning(false);
+
+        setTimeout(() => {
+          setOrderedNames((prev) => [...prev, picked]);
+          setRemaining((prev) => prev.filter((n) => n !== picked));
+          setSelectedName(null);
+        }, 800);
+      }
+    }
+    animate();
+  }
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = 500;
+    canvas.height = 500;
+    const ctx = canvas.getContext("2d");
+    drawWheel(ctx, 500, 500, remaining, angleRef.current);
+  }, [remaining]);
+
+  useEffect(() => {
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, []);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: 400, height: 400, borderRadius: "50%", boxShadow: "0 0 60px rgba(255,230,109,0.3)" }}
+      />
+
+      {selectedName && (
+        <div style={{
+          fontSize: 28, fontWeight: 900, color: "#FFE66D",
+          animation: "slideInUp 0.4s ease", textAlign: "center",
+        }}>
+          #{orderedNames.length + 1}: {selectedName}
+        </div>
+      )}
+
+      {orderedNames.length > 0 && (
+        <div style={{
+          display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 500,
+        }}>
+          {orderedNames.map((n, i) => (
+            <div key={n} style={{
+              background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)",
+              borderRadius: 10, padding: "6px 12px", fontSize: 13, color: "#fff",
+            }}>
+              <strong style={{ color: "#FFE66D" }}>#{i + 1}</strong> {n}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {done && (
+        <div style={{ fontSize: 20, fontWeight: 900, color: "#4ECDC4", animation: "slideInUp 0.5s ease" }}>
+          Order locked in! Starting voting...
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN APP — Round-based: one candidate at a time, everyone votes together
 ═══════════════════════════════════════════════════════════════ */
@@ -592,6 +765,8 @@ export default function VibeShowdown() {
 
   const [voterOrder, setVoterOrder] = useState([]);
   const [presentationOrder, setPresentationOrder] = useState([]);
+
+  const [sessionLocked, setSessionLocked] = useState(false);
 
   const [activeVoter, setActiveVoter] = useState(null);
   const [doneVoters, setDoneVoters] = useState(new Set());
@@ -655,12 +830,13 @@ export default function VibeShowdown() {
     setSessionId(sid);
     setPeople(data.participants);
     setVoterOrder(data.voter_order);
-    setPresentationOrder(data.presentation_order);
+    setPresentationOrder(data.presentation_order || []);
     setCurrentRound(data.current_round || 0);
+    setSessionLocked(data.locked || false);
     await loadClaims(sid);
     subscribeToClaims(sid);
     subscribeToSession(sid);
-    if (data.phase === "voting") {
+    if (data.presentation_order && data.presentation_order.length > 0) {
       setPhase("login");
     } else {
       setPhase(data.phase || "login");
@@ -709,17 +885,14 @@ export default function VibeShowdown() {
         { event: "UPDATE", schema: "public", table: "sessions", filter: `id=eq.${sid}` },
         (payload) => {
           const row = payload.new;
+          if (row.locked != null) setSessionLocked(row.locked);
           if (row.current_round != null) {
             setCurrentRound(row.current_round);
             setMyVoteSubmitted(false);
             setRoundScores({});
           }
-          if (row.phase) {
-            if (row.phase === "voting" && phase === "login") {
-              // don't override — voter still needs to claim name
-            } else if (row.phase === "results") {
-              // only CEO triggers results locally
-            }
+          if (row.presentation_order && row.presentation_order.length > 0) {
+            setPresentationOrder(row.presentation_order);
           }
         }
       )
@@ -762,11 +935,17 @@ export default function VibeShowdown() {
     };
   }, []);
 
+  // Auto-transition to voting when presentation_order is set and voter has claimed
+  useEffect(() => {
+    if (phase === "login" && activeVoter && presentationOrder.length > 0) {
+      setPhase("voting");
+    }
+  }, [phase, activeVoter, presentationOrder]);
+
   // When round changes or voting starts, subscribe to votes for current candidate
   useEffect(() => {
     if (phase === "voting" && sessionId && currentCandidate) {
       const votersForCandidate = voterOrder.filter((p) => p !== currentCandidate);
-      // +1 for CEO
       setTotalVoters(votersForCandidate.length + 1);
       subscribeToVotes(sessionId, currentCandidate);
     }
@@ -776,18 +955,17 @@ export default function VibeShowdown() {
   async function startShow() {
     if (people.length < 2) return;
     const vOrder = shuffle(people);
-    const pOrder = shuffle(people);
     setVoterOrder(vOrder);
-    setPresentationOrder(pOrder);
 
     const { data, error } = await supabase
       .from("sessions")
       .insert({
-        phase: "voting",
+        phase: "login",
         participants: people,
-        presentation_order: pOrder,
+        presentation_order: [],
         voter_order: vOrder,
         current_round: 0,
+        locked: false,
       })
       .select()
       .single();
@@ -800,12 +978,33 @@ export default function VibeShowdown() {
     setSessionId(sid);
     setIsCeo(true);
     setCurrentRound(0);
+    setSessionLocked(false);
     const url = new URL(window.location);
     url.searchParams.set("s", sid);
     window.history.replaceState({}, "", url);
     subscribeToClaims(sid);
     subscribeToSession(sid);
     setPhase("login");
+  }
+
+  async function lockNamesAndSpin() {
+    if (!sessionId) return;
+    await supabase
+      .from("sessions")
+      .update({ locked: true })
+      .eq("id", sessionId);
+    setSessionLocked(true);
+    setPhase("spin");
+  }
+
+  async function onWheelComplete(orderedNames) {
+    setPresentationOrder(orderedNames);
+    await supabase
+      .from("sessions")
+      .update({ presentation_order: orderedNames, current_round: 0, phase: "voting" })
+      .eq("id", sessionId);
+    setCurrentRound(0);
+    setPhase("voting");
   }
 
   async function requestVoting(voter) {
@@ -1333,7 +1532,10 @@ export default function VibeShowdown() {
   /* ═══════════════════════════════════════════════════════════════
      PHASE: LOGIN — Claim your name
   ═══════════════════════════════════════════════════════════════ */
-  if (phase === "login")
+  if (phase === "login") {
+    const claimedCount = claimedVoters.size;
+    const canLock = isCeo && claimedCount >= 2 && !sessionLocked;
+
     return (
       <div style={S.root}>
         <StarBg />
@@ -1346,45 +1548,52 @@ export default function VibeShowdown() {
               🎪 CLAIM YOUR NAME
             </h1>
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, margin: 0 }}>
-              Tap your name to join the voting session. Everyone votes on one candidate at a time.
+              {sessionLocked
+                ? "Names are locked! Waiting for the order to be determined..."
+                : "Tap your name to join the voting session."}
             </p>
-            {currentCandidate && (
-              <div style={{ marginTop: 16, background: "rgba(255,230,109,0.1)", border: "1px solid rgba(255,230,109,0.3)", borderRadius: 14, padding: "10px 20px", display: "inline-block", fontSize: 14 }}>
-                <span style={{ color: "#FFE66D" }}>Now presenting: <strong>{currentCandidate}</strong> (Round {currentRound + 1} of {presentationOrder.length})</span>
-              </div>
-            )}
+            <div style={{ marginTop: 16, display: "inline-flex", gap: 24, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: "10px 20px", fontSize: 14 }}>
+              <span style={{ color: "#4ECDC4" }}>
+                ✅ <strong>{claimedCount}</strong> joined
+              </span>
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>
+                ⏳ <strong>{voterOrder.length - claimedCount}</strong> unclaimed
+              </span>
+            </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, maxWidth: 860, margin: "0 auto" }}>
             {voterOrder.map((p) => {
               const claimed = claimedVoters.has(p);
+              const lockedOut = sessionLocked && !claimed;
+              const disabled = claimed || lockedOut;
               const i = people.indexOf(p);
               const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
               return (
-                <button key={p} onClick={() => !claimed && requestVoting(p)} disabled={claimed}
+                <button key={p} onClick={() => !disabled && requestVoting(p)} disabled={disabled}
                   style={{
-                    background: claimed ? "rgba(255,255,255,0.04)" : `linear-gradient(135deg, ${color}22, ${color}11)`,
-                    border: claimed ? "2px dashed rgba(78,205,196,0.3)" : `2px solid ${color}55`,
-                    borderRadius: 18, padding: "18px 14px", cursor: claimed ? "default" : "pointer",
+                    background: disabled ? "rgba(255,255,255,0.04)" : `linear-gradient(135deg, ${color}22, ${color}11)`,
+                    border: claimed ? "2px dashed rgba(78,205,196,0.3)" : lockedOut ? "1px solid rgba(255,255,255,0.07)" : `2px solid ${color}55`,
+                    borderRadius: 18, padding: "18px 14px", cursor: disabled ? "default" : "pointer",
                     textAlign: "center", transition: "transform 0.15s, box-shadow 0.15s",
-                    opacity: claimed ? 0.5 : 1, fontFamily: "inherit",
+                    opacity: disabled ? 0.5 : 1, fontFamily: "inherit",
                   }}
-                  onMouseEnter={(e) => { if (!claimed) e.currentTarget.style.transform = "translateY(-4px)"; }}
+                  onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.transform = "translateY(-4px)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
                 >
                   <div style={{
                     width: 52, height: 52, borderRadius: "50%",
-                    background: claimed ? "rgba(78,205,196,0.2)" : color,
+                    background: claimed ? "rgba(78,205,196,0.2)" : lockedOut ? "rgba(255,255,255,0.06)" : color,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     margin: "0 auto 10px", fontSize: 18, fontWeight: 900,
-                    color: claimed ? "rgba(255,255,255,0.3)" : "#000",
-                    boxShadow: claimed ? "none" : `0 4px 16px ${color}66`,
+                    color: disabled ? "rgba(255,255,255,0.3)" : "#000",
+                    boxShadow: disabled ? "none" : `0 4px 16px ${color}66`,
                   }}>
-                    {claimed ? "✓" : initials(p)}
+                    {claimed ? "✓" : lockedOut ? "✕" : initials(p)}
                   </div>
-                  <div style={{ color: claimed ? "rgba(255,255,255,0.3)" : "#fff", fontWeight: 700, fontSize: 14 }}>{p}</div>
-                  <div style={{ fontSize: 11, color: claimed ? "#4ECDC4" : "rgba(255,255,255,0.35)", marginTop: 4 }}>
-                    {claimed ? "Joined ✅" : "🔒 Tap to join"}
+                  <div style={{ color: disabled ? "rgba(255,255,255,0.3)" : "#fff", fontWeight: 700, fontSize: 14 }}>{p}</div>
+                  <div style={{ fontSize: 11, color: claimed ? "#4ECDC4" : lockedOut ? "#FF6B6B" : "rgba(255,255,255,0.35)", marginTop: 4 }}>
+                    {claimed ? "Joined ✅" : lockedOut ? "Locked out" : "🔒 Tap to join"}
                   </div>
                 </button>
               );
@@ -1403,6 +1612,39 @@ export default function VibeShowdown() {
                 style={{ ...S.btn("rgba(78,205,196,0.3)", "#fff"), padding: "8px 16px", fontSize: 13 }}>Copy</button>
             </div>
           )}
+
+          {/* CEO Lock & Spin button */}
+          {canLock && (
+            <div style={{ textAlign: "center", marginTop: 20 }}>
+              <button onClick={lockNamesAndSpin}
+                style={{ ...S.btn("linear-gradient(135deg, #FFE66D, #FF6B6B)"), fontSize: 20, padding: "18px 48px", boxShadow: "0 6px 32px rgba(255,107,107,0.4)", animation: "pulse 2s ease-in-out infinite" }}>
+                🎡 Lock Names & Spin the Wheel ({claimedCount} joined)
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     PHASE: SPIN — Wheel determines presentation order (CEO only)
+  ═══════════════════════════════════════════════════════════════ */
+  if (phase === "spin")
+    return (
+      <div style={S.root}>
+        <StarBg />
+        <div style={{ ...S.page, textAlign: "center" }}>
+          <div style={{ marginBottom: 32 }}>
+            <div style={{ fontSize: 56, marginBottom: 8 }}>🎡</div>
+            <h1 style={{ ...S.title, fontSize: 36, margin: 0 }}>
+              SPINNING FOR ORDER
+            </h1>
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 15, margin: "8px 0 0" }}>
+              The wheel decides who presents in what order...
+            </p>
+          </div>
+          <SpinWheel names={[...claimedVoters]} onComplete={onWheelComplete} />
         </div>
       </div>
     );
@@ -1410,9 +1652,9 @@ export default function VibeShowdown() {
   /* ═══════════════════════════════════════════════════════════════
      PHASE: VOTING — One candidate at a time, everyone votes together
   ═══════════════════════════════════════════════════════════════ */
-  if (phase === "voting" && currentCandidate) {
+  if (phase === "voting" && currentCandidate && activeVoter) {
     const candidateColor = AVATAR_COLORS[people.indexOf(currentCandidate) % AVATAR_COLORS.length];
-    const voterColor = activeVoter ? AVATAR_COLORS[people.indexOf(activeVoter) % AVATAR_COLORS.length] : "#888";
+    const voterColor = AVATAR_COLORS[people.indexOf(activeVoter) % AVATAR_COLORS.length] || "#888";
     const isSelf = activeVoter === currentCandidate;
 
     if (isSelf || myVoteSubmitted) {
@@ -2151,15 +2393,17 @@ export default function VibeShowdown() {
             })}
           </div>
 
-          {allRevealed && (
+          {allRevealed && isCeo && (
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <button
                 onClick={() => {
+                  if (!window.confirm("Start a new show? This ends the current session.")) return;
                   if (subscriptionRef.current) supabase.removeChannel(subscriptionRef.current);
                   if (sessionSubRef.current) supabase.removeChannel(sessionSubRef.current);
                   if (votesSubRef.current) supabase.removeChannel(votesSubRef.current);
                   setSessionId(null);
                   setIsCeo(true);
+                  setSessionLocked(false);
                   const url = new URL(window.location);
                   url.searchParams.delete("s");
                   window.history.replaceState({}, "", url);
@@ -2184,7 +2428,7 @@ export default function VibeShowdown() {
                   padding: "14px 36px",
                 }}
               >
-                🔄 Run Another Show
+                🔄 New Show
               </button>
             </div>
           )}
