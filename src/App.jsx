@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "./supabase";
 
 /* ─── DATA ─────────────────────────────────────────────────────── */
 const CATEGORIES = [
@@ -583,14 +584,13 @@ function ScratchCard({ width, height, onComplete, children }) {
    MAIN APP
 ═══════════════════════════════════════════════════════════════ */
 export default function VibeShowdown() {
-  const [phase, setPhase] = useState("setup");
+  const [phase, setPhase] = useState("loading");
   const [people, setPeople] = useState(INITIAL_PEOPLE);
   const [addName, setAddName] = useState("");
+  const [sessionId, setSessionId] = useState(null);
+  const [isCeo, setIsCeo] = useState(false);
 
-  // Randomized voting order (set when show starts)
   const [voterOrder, setVoterOrder] = useState([]);
-
-  // Presentation order (same for all voters, set once at show start)
   const [presentationOrder, setPresentationOrder] = useState([]);
 
   const [activeVoter, setActiveVoter] = useState(null);
@@ -616,24 +616,126 @@ export default function VibeShowdown() {
   const [autoRevealing, setAutoRevealing] = useState(false);
   const [ceoAlert, setCeoAlert] = useState(false);
 
+  const subscriptionRef = useRef(null);
+
   const participants = people;
   const regularVoters = voterOrder.length > 0 ? voterOrder : people;
   const pendingVoters = regularVoters.filter(
     (p) => !doneVoters.has(p) && !claimedVoters.has(p)
   );
-  const allRegularDone =
-    voterOrder.length > 0 &&
-    regularVoters.every(
-      (p) => doneVoters.has(p) || claimedVoters.has(p)
-    );
   const allVotesSubmitted =
     voterOrder.length > 0 &&
     regularVoters.every((p) => doneVoters.has(p));
 
-  function startShow() {
+  /* ── On mount: check URL for ?s=sessionId ── */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get("s");
+    if (sid) {
+      loadSession(sid);
+    } else {
+      setIsCeo(true);
+      setPhase("setup");
+    }
+  }, []);
+
+  async function loadSession(sid) {
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", sid)
+      .single();
+    if (error || !data) {
+      console.error("Session not found", error);
+      setIsCeo(true);
+      setPhase("setup");
+      return;
+    }
+    setSessionId(sid);
+    setPeople(data.participants);
+    setVoterOrder(data.voter_order);
+    setPresentationOrder(data.presentation_order);
+    await loadClaims(sid);
+    subscribeToClaims(sid);
+    setPhase("login");
+  }
+
+  async function loadClaims(sid) {
+    const { data } = await supabase
+      .from("claims")
+      .select("voter_name, status")
+      .eq("session_id", sid);
+    if (!data) return;
+    const claimed = new Set();
+    const done = new Set();
+    data.forEach((c) => {
+      claimed.add(c.voter_name);
+      if (c.status === "done") done.add(c.voter_name);
+    });
+    setClaimedVoters(claimed);
+    setDoneVoters(done);
+  }
+
+  function subscribeToClaims(sid) {
+    if (subscriptionRef.current) {
+      supabase.removeChannel(subscriptionRef.current);
+    }
+    const channel = supabase
+      .channel(`claims-${sid}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "claims",
+          filter: `session_id=eq.${sid}`,
+        },
+        () => {
+          loadClaims(sid);
+        }
+      )
+      .subscribe();
+    subscriptionRef.current = channel;
+  }
+
+  useEffect(() => {
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+      }
+    };
+  }, []);
+
+  /* ── CEO: Start the show ── */
+  async function startShow() {
     if (people.length < 2) return;
-    setVoterOrder(shuffle(people));
-    setPresentationOrder(shuffle(people));
+    const vOrder = shuffle(people);
+    const pOrder = shuffle(people);
+    setVoterOrder(vOrder);
+    setPresentationOrder(pOrder);
+
+    const { data, error } = await supabase
+      .from("sessions")
+      .insert({
+        phase: "login",
+        participants: people,
+        presentation_order: pOrder,
+        voter_order: vOrder,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to create session", error);
+      return;
+    }
+    const sid = data.id;
+    setSessionId(sid);
+    setIsCeo(true);
+    const url = new URL(window.location);
+    url.searchParams.set("s", sid);
+    window.history.replaceState({}, "", url);
+    subscribeToClaims(sid);
     setPhase("login");
   }
 
@@ -641,18 +743,33 @@ export default function VibeShowdown() {
     return presentationOrder.filter((p) => p !== voter);
   }
 
-  function requestVoting(voter) {
+  async function requestVoting(voter) {
     setPendingVoter(voter);
     setShowLock(true);
   }
 
-  function unlockAndVote() {
+  async function unlockAndVote() {
     setShowLock(false);
     const voter = pendingVoter;
+
+    const { error } = await supabase.from("claims").insert({
+      session_id: sessionId,
+      voter_name: voter,
+      status: "claimed",
+    });
+
+    if (error) {
+      if (error.code === "23505") {
+        alert(`${voter} has already been claimed by someone else!`);
+        return;
+      }
+      console.error("Claim failed", error);
+      return;
+    }
+
     setClaimedVoters((prev) => new Set([...prev, voter]));
     setActiveVoter(voter);
-    const existing = allVotes[voter] || {};
-    setCurrentScores(existing);
+    setCurrentScores({});
     setScoringIdx(0);
     setPhase("voting");
   }
@@ -667,20 +784,47 @@ export default function VibeShowdown() {
     }));
   }
 
-  function submitVoterScores() {
+  async function submitVoterScores() {
     const voter = activeVoter;
-    setAllVotes((prev) => ({ ...prev, [voter]: currentScores }));
-    setDoneVoters((prev) => {
-      const next = new Set([...prev, voter]);
-      if (voterOrder.every((p) => next.has(p))) {
-        setCeoAlert(true);
-      }
-      return next;
+    const rows = [];
+    const targets = targetsFor(voter);
+    targets.forEach((target) => {
+      const scores = currentScores[target] || {};
+      CATEGORIES.forEach((cat) => {
+        if (scores[cat.id] != null) {
+          rows.push({
+            session_id: sessionId,
+            voter_name: voter,
+            participant_name: target,
+            category_id: cat.id,
+            score: scores[cat.id],
+            is_ceo: false,
+          });
+        }
+      });
     });
+
+    const { error: voteErr } = await supabase.from("votes").upsert(rows, {
+      onConflict: "session_id,voter_name,participant_name,category_id",
+    });
+    if (voteErr) console.error("Vote write failed", voteErr);
+
+    await supabase
+      .from("claims")
+      .update({ status: "done" })
+      .eq("session_id", sessionId)
+      .eq("voter_name", voter);
+
+    setDoneVoters((prev) => new Set([...prev, voter]));
     setActiveVoter(null);
     setCurrentScores({});
     setScoringIdx(0);
-    setPhase("login");
+
+    if (isCeo) {
+      setPhase("login");
+    } else {
+      setPhase("voter-done");
+    }
   }
 
   function startCeoVoting() {
@@ -698,21 +842,75 @@ export default function VibeShowdown() {
     }));
   }
 
-  function submitCeoVote() {
+  async function submitCeoVote() {
+    const rows = [];
+    participants.forEach((target) => {
+      const scores = ceoScores[target] || {};
+      CATEGORIES.forEach((cat) => {
+        if (scores[cat.id] != null) {
+          rows.push({
+            session_id: sessionId,
+            voter_name: "__CEO__",
+            participant_name: target,
+            category_id: cat.id,
+            score: scores[cat.id],
+            is_ceo: true,
+          });
+        }
+      });
+    });
+
+    const { error } = await supabase.from("votes").upsert(rows, {
+      onConflict: "session_id,voter_name,participant_name,category_id",
+    });
+    if (error) console.error("CEO vote write failed", error);
+
     setCeoDone(true);
-    calculateAndReveal();
+    await calculateAndReveal();
   }
 
-  function calculateAndReveal() {
-    const scored = participants.map((p) => {
-      const ceo = ceoScores[p] || {};
-      const ceoTotal = CATEGORIES.reduce((s, c) => s + (ceo[c.id] || 0), 0);
+  async function calculateAndReveal() {
+    const { data: allVoteRows } = await supabase
+      .from("votes")
+      .select("*")
+      .eq("session_id", sessionId);
 
-      const voterList = regularVoters.filter((v) => v !== p);
+    if (!allVoteRows) return;
+
+    const teamVotes = allVoteRows.filter((v) => !v.is_ceo);
+    const ceoVotes = allVoteRows.filter((v) => v.is_ceo);
+
+    const scored = participants.map((p) => {
+      const ceoForP = {};
+      ceoVotes
+        .filter((v) => v.participant_name === p)
+        .forEach((v) => {
+          ceoForP[v.category_id] = v.score;
+        });
+      const ceoTotal = CATEGORIES.reduce(
+        (s, c) => s + (ceoForP[c.id] || 0),
+        0
+      );
+
+      const voterNames = [
+        ...new Set(
+          teamVotes
+            .filter((v) => v.participant_name === p)
+            .map((v) => v.voter_name)
+        ),
+      ];
       const catMeans = CATEGORIES.map((cat) => {
-        const vals = voterList
-          .filter((v) => allVotes[v]?.[p]?.[cat.id] != null)
-          .map((v) => allVotes[v][p][cat.id]);
+        const vals = voterNames
+          .map((vn) => {
+            const row = teamVotes.find(
+              (v) =>
+                v.voter_name === vn &&
+                v.participant_name === p &&
+                v.category_id === cat.id
+            );
+            return row ? row.score : null;
+          })
+          .filter((v) => v != null);
         if (!vals.length) return 0;
         return vals.reduce((a, b) => a + b, 0) / vals.length;
       });
@@ -728,7 +926,7 @@ export default function VibeShowdown() {
           id: cat.id,
           icon: cat.icon,
           name: cat.name,
-          ceo: ceo[cat.id] || 0,
+          ceo: ceoForP[cat.id] || 0,
           team: Math.round(catMeans[i] * 10) / 10,
         })),
       };
@@ -739,6 +937,20 @@ export default function VibeShowdown() {
     setRevealingIdx(-1);
     setPhase("results");
   }
+
+  /* ── CEO alert when all votes come in via realtime ── */
+  useEffect(() => {
+    if (
+      isCeo &&
+      phase === "login" &&
+      voterOrder.length > 0 &&
+      voterOrder.every((p) => doneVoters.has(p)) &&
+      !ceoAlert &&
+      !ceoDone
+    ) {
+      setCeoAlert(true);
+    }
+  }, [doneVoters, isCeo, phase, voterOrder, ceoAlert, ceoDone]);
 
   function revealSlot(idx) {
     setRevealed((prev) => {
@@ -884,6 +1096,32 @@ export default function VibeShowdown() {
       display: "block",
     },
   };
+
+  /* ═══════════════════════════════════════════════════════════════
+     PHASE: LOADING
+  ═══════════════════════════════════════════════════════════════ */
+  if (phase === "loading")
+    return (
+      <div style={S.root}>
+        <StarBg />
+        <div
+          style={{
+            ...S.page,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "80vh",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <div style={{ fontSize: 64 }}>🎪</div>
+          <h1 style={{ ...S.title, fontSize: 32, margin: 0 }}>
+            Loading Showdown...
+          </h1>
+        </div>
+      </div>
+    );
 
   /* ═══════════════════════════════════════════════════════════════
      PHASE: SETUP
@@ -1406,11 +1644,60 @@ export default function VibeShowdown() {
             })}
           </div>
 
-          {/* Ben / CEO section */}
+          {/* Share link (CEO only) */}
+          {isCeo && sessionId && (
+            <div
+              style={{
+                maxWidth: 860,
+                margin: "20px auto",
+                ...S.card("rgba(78,205,196,0.06)"),
+                border: "1px solid rgba(78,205,196,0.2)",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ color: "#4ECDC4", fontWeight: 700, fontSize: 14 }}>
+                📎 Share this link with voters:
+              </span>
+              <code
+                style={{
+                  flex: 1,
+                  background: "rgba(0,0,0,0.3)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  color: "#fff",
+                  fontSize: 13,
+                  wordBreak: "break-all",
+                  cursor: "pointer",
+                }}
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                }}
+                title="Click to copy"
+              >
+                {window.location.href}
+              </code>
+              <button
+                onClick={() => navigator.clipboard.writeText(window.location.href)}
+                style={{
+                  ...S.btn("rgba(78,205,196,0.3)", "#fff"),
+                  padding: "8px 16px",
+                  fontSize: 13,
+                }}
+              >
+                Copy
+              </button>
+            </div>
+          )}
+
+          {/* Ben / CEO section (CEO only) */}
+          {isCeo && (
           <div
             style={{
               maxWidth: 860,
-              margin: "28px auto 0",
+              margin: "8px auto 0",
               ...S.card("rgba(255,230,109,0.08)"),
               border: "1px solid rgba(255,230,109,0.3)",
             }}
@@ -1488,6 +1775,7 @@ export default function VibeShowdown() {
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
     );
@@ -2887,6 +3175,14 @@ export default function VibeShowdown() {
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <button
                 onClick={() => {
+                  if (subscriptionRef.current) {
+                    supabase.removeChannel(subscriptionRef.current);
+                  }
+                  setSessionId(null);
+                  setIsCeo(true);
+                  const url = new URL(window.location);
+                  url.searchParams.delete("s");
+                  window.history.replaceState({}, "", url);
                   setPhase("setup");
                   setAllVotes({});
                   setDoneVoters(new Set());
@@ -2916,6 +3212,56 @@ export default function VibeShowdown() {
       </div>
     );
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     PHASE: VOTER DONE — Thank you screen for non-CEO voters
+  ═══════════════════════════════════════════════════════════════ */
+  if (phase === "voter-done")
+    return (
+      <div style={S.root}>
+        <StarBg />
+        <div
+          style={{
+            ...S.page,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "80vh",
+            flexDirection: "column",
+            gap: 20,
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 72 }}>🗳️</div>
+          <h1 style={{ ...S.title, fontSize: 36, margin: 0 }}>
+            YOUR VOTE IS IN!
+          </h1>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.5)",
+              fontSize: 17,
+              maxWidth: 400,
+              lineHeight: 1.6,
+              margin: 0,
+            }}
+          >
+            Thanks for voting! Your scores are confidential and locked in.
+            <br />
+            Sit tight — Ben will reveal the results on screen shortly.
+          </p>
+          <div
+            style={{
+              marginTop: 12,
+              fontSize: 48,
+              animation: "crownBounce 2s ease-in-out infinite",
+              display: "inline-block",
+            }}
+          >
+            🎪
+          </div>
+        </div>
+      </div>
+    );
 
   return null;
 }
