@@ -102,7 +102,6 @@ const INITIAL_PEOPLE = [
   "Ren",
   "Rod",
   "Rosie",
-  CEO_NAME,
 ];
 
 const AVATAR_COLORS = [
@@ -797,7 +796,8 @@ export default function VibeShowdown() {
   const sessionSubRef = useRef(null);
   const votesSubRef = useRef(null);
 
-  const participants = people;
+  const participants = people.filter((p) => p !== CEO_NAME);
+  const allVoters = [...people, ...(people.includes(CEO_NAME) ? [] : [CEO_NAME])];
   const pendingVoters = voterOrder.filter(
     (p) => !doneVoters.has(p) && !claimedVoters.has(p)
   );
@@ -949,7 +949,7 @@ export default function VibeShowdown() {
   useEffect(() => {
     if (phase === "voting" && sessionId && currentCandidate) {
       const votersForCandidate = voterOrder.filter((p) => p !== currentCandidate);
-      setTotalVoters(votersForCandidate.length + 1);
+      setTotalVoters(votersForCandidate.length);
       subscribeToVotes(sessionId, currentCandidate);
     }
   }, [phase, sessionId, currentRound, currentCandidate]);
@@ -957,14 +957,15 @@ export default function VibeShowdown() {
   /* ── CEO: Start the show ── */
   async function startShow() {
     if (people.length < 2) return;
-    const vOrder = shuffle(people);
+    const allNames = [...people, ...(people.includes(CEO_NAME) ? [] : [CEO_NAME])];
+    const vOrder = shuffle(allNames);
     setVoterOrder(vOrder);
 
     const { data, error } = await supabase
       .from("sessions")
       .insert({
         phase: "login",
-        participants: people,
+        participants: allNames,
         presentation_order: [],
         voter_order: vOrder,
         current_round: 0,
@@ -1675,7 +1676,7 @@ export default function VibeShowdown() {
               The wheel decides who presents in what order...
             </p>
           </div>
-          <SpinWheel names={[...claimedVoters]} onComplete={onWheelComplete} />
+          <SpinWheel names={[...claimedVoters].filter((n) => n !== CEO_NAME)} onComplete={onWheelComplete} />
         </div>
       </div>
     );
