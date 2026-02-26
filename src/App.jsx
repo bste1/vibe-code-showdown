@@ -1258,6 +1258,54 @@ export default function VibeShowdown() {
   const roundComplete = CATEGORIES.every((c) => roundScores[c.id] != null);
   const roundTotal = CATEGORIES.reduce((s, c) => s + (roundScores[c.id] || 0), 0);
 
+  function resetShow() {
+    if (!window.confirm("Reset the show? This ends the current session for everyone.")) return;
+    if (subscriptionRef.current) supabase.removeChannel(subscriptionRef.current);
+    if (sessionSubRef.current) supabase.removeChannel(sessionSubRef.current);
+    if (votesSubRef.current) supabase.removeChannel(votesSubRef.current);
+    localStorage.removeItem("vibe_ceo_session");
+    if (sessionId) localStorage.removeItem(`vibe_voter_${sessionId}`);
+    setSessionId(null);
+    setActiveVoter(null);
+    setIsCeo(true);
+    setSessionLocked(false);
+    const url = new URL(window.location);
+    url.searchParams.delete("s");
+    window.history.replaceState({}, "", url);
+    setPhase("setup");
+    setDoneVoters(new Set());
+    setClaimedVoters(new Set());
+    setCurrentRound(0);
+    setRoundScores({});
+    setMyVoteSubmitted(false);
+    setRoundVoteCount(0);
+    setResults([]);
+    setRevealed([]);
+    setAllRevealed(false);
+    setVoterOrder([]);
+    setPresentationOrder([]);
+    setAutoRevealing(false);
+    setRevealingIdx(-1);
+  }
+
+  const ceoResetBtn = isCeo && phase !== "setup" ? (
+    <button
+      onClick={resetShow}
+      style={{
+        position: "fixed", top: 12, right: 12, zIndex: 10000,
+        background: "rgba(255,50,50,0.15)", border: "1px solid rgba(255,50,50,0.3)",
+        borderRadius: 10, padding: "6px 14px", cursor: "pointer",
+        color: "rgba(255,100,100,0.7)", fontSize: 11, fontWeight: 700,
+        fontFamily: "'Trebuchet MS', sans-serif", letterSpacing: 0.5,
+        backdropFilter: "blur(8px)", transition: "all 0.2s",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,50,50,0.3)"; e.currentTarget.style.color = "#fff"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,50,50,0.15)"; e.currentTarget.style.color = "rgba(255,100,100,0.7)"; }}
+    >
+      🔄 Reset
+    </button>
+  ) : null;
+
   /* ─── STYLES ─────────────────────────────────────────────────── */
   const S = {
     root: {
@@ -1327,6 +1375,7 @@ export default function VibeShowdown() {
     return (
       <div style={S.root}>
         <StarBg />
+        {ceoResetBtn}
         <div
           style={{
             ...S.page,
@@ -1354,6 +1403,7 @@ export default function VibeShowdown() {
       <div style={S.root}>
 
         <StarBg />
+        {ceoResetBtn}
         <div style={S.page}>
           <div style={{ textAlign: "center", marginBottom: 40 }}>
             <div style={{ fontSize: 64, marginBottom: 8, lineHeight: 1 }}>
@@ -1599,6 +1649,7 @@ export default function VibeShowdown() {
     return (
       <div style={S.root}>
         <StarBg />
+        {ceoResetBtn}
         {showLock && pendingVoter && (
           <LockScreen voterName={pendingVoter} onUnlock={unlockAndVote} />
         )}
@@ -1717,6 +1768,7 @@ export default function VibeShowdown() {
     return (
       <div style={S.root}>
         <StarBg />
+        {ceoResetBtn}
         <div style={{ ...S.page, textAlign: "center" }}>
           <div style={{ marginBottom: 32 }}>
             <div style={{ fontSize: 56, marginBottom: 8 }}>🎡</div>
@@ -1744,6 +1796,7 @@ export default function VibeShowdown() {
       return (
         <div style={S.root}>
           <StarBg />
+        {ceoResetBtn}
           <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "80vh", flexDirection: "column", gap: 20, textAlign: "center" }}>
             <div style={{ fontSize: 64, animation: "crownBounce 2s ease-in-out infinite", display: "inline-block" }}>
               {isSelf ? "🙈" : "✅"}
@@ -1789,6 +1842,7 @@ export default function VibeShowdown() {
     return (
       <div style={S.root}>
         <StarBg />
+        {ceoResetBtn}
         <div style={S.page}>
           {/* Top bar */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
@@ -1956,6 +2010,7 @@ export default function VibeShowdown() {
       <div style={S.root}>
 
         <StarBg />
+        {ceoResetBtn}
         <Confetti active={confetti} />
         <UnicornCelebration active={unicorns} />
         <SadRain active={sadRain} />
@@ -2479,40 +2534,8 @@ export default function VibeShowdown() {
           {allRevealed && isCeo && (
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <button
-                onClick={() => {
-                  if (!window.confirm("Start a new show? This ends the current session.")) return;
-                  if (subscriptionRef.current) supabase.removeChannel(subscriptionRef.current);
-                  if (sessionSubRef.current) supabase.removeChannel(sessionSubRef.current);
-                  if (votesSubRef.current) supabase.removeChannel(votesSubRef.current);
-                  localStorage.removeItem("vibe_ceo_session");
-                  if (sessionId) localStorage.removeItem(`vibe_voter_${sessionId}`);
-                  setSessionId(null);
-                  setActiveVoter(null);
-                  setIsCeo(true);
-                  setSessionLocked(false);
-                  const url = new URL(window.location);
-                  url.searchParams.delete("s");
-                  window.history.replaceState({}, "", url);
-                  setPhase("setup");
-                  setDoneVoters(new Set());
-                  setClaimedVoters(new Set());
-                  setCurrentRound(0);
-                  setRoundScores({});
-                  setMyVoteSubmitted(false);
-                  setRoundVoteCount(0);
-                  setResults([]);
-                  setRevealed([]);
-                  setAllRevealed(false);
-                  setVoterOrder([]);
-                  setPresentationOrder([]);
-                  setAutoRevealing(false);
-                  setRevealingIdx(-1);
-                }}
-                style={{
-                  ...S.btn(),
-                  fontSize: 16,
-                  padding: "14px 36px",
-                }}
+                onClick={resetShow}
+                style={{ ...S.btn(), fontSize: 16, padding: "14px 36px" }}
               >
                 🔄 New Show
               </button>
@@ -2530,6 +2553,7 @@ export default function VibeShowdown() {
     return (
       <div style={S.root}>
         <StarBg />
+        {ceoResetBtn}
         <div
           style={{
             ...S.page,
