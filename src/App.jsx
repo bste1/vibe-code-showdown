@@ -806,13 +806,27 @@ export default function VibeShowdown() {
   const isLastRound = currentRound >= presentationOrder.length - 1;
   const allRoundVotesIn = totalVoters > 0 && roundVoteCount >= totalVoters;
 
-  /* ── On mount: check URL for ?s=sessionId ── */
+  /* ── On mount: check URL for ?s=sessionId, restore voter from localStorage ── */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sid = params.get("s");
     if (sid) {
       loadSession(sid);
     } else {
+      const savedCeo = localStorage.getItem("vibe_ceo_session");
+      if (savedCeo) {
+        try {
+          const { sessionId: savedSid } = JSON.parse(savedCeo);
+          if (savedSid) {
+            const url = new URL(window.location);
+            url.searchParams.set("s", savedSid);
+            window.history.replaceState({}, "", url);
+            setIsCeo(true);
+            loadSession(savedSid);
+            return;
+          }
+        } catch (_) {}
+      }
       setIsCeo(true);
       setPhase("setup");
     }
@@ -839,6 +853,40 @@ export default function VibeShowdown() {
     await loadClaims(sid);
     subscribeToClaims(sid);
     subscribeToSession(sid);
+
+    // Restore voter identity from localStorage
+    const saved = localStorage.getItem(`vibe_voter_${sid}`);
+    if (saved) {
+      const { voterName, isCeo: wasCeo } = JSON.parse(saved);
+      const { data: claimRows } = await supabase
+        .from("claims")
+        .select("voter_name")
+        .eq("session_id", sid)
+        .eq("voter_name", voterName);
+      if (claimRows && claimRows.length > 0) {
+        setActiveVoter(voterName);
+        if (wasCeo) setIsCeo(true);
+        // Check if already voted this round
+        if (data.presentation_order && data.presentation_order.length > 0) {
+          const currentCand = data.presentation_order[data.current_round || 0];
+          if (currentCand) {
+            const { data: myVotes } = await supabase
+              .from("votes")
+              .select("id")
+              .eq("session_id", sid)
+              .eq("voter_name", voterName)
+              .eq("participant_name", currentCand)
+              .limit(1);
+            if (myVotes && myVotes.length > 0) {
+              setMyVoteSubmitted(true);
+            }
+          }
+          setPhase("voting");
+          return;
+        }
+      }
+    }
+
     if (data.presentation_order && data.presentation_order.length > 0) {
       setPhase("login");
     } else {
@@ -986,6 +1034,7 @@ export default function VibeShowdown() {
     const url = new URL(window.location);
     url.searchParams.set("s", sid);
     window.history.replaceState({}, "", url);
+    localStorage.setItem("vibe_ceo_session", JSON.stringify({ sessionId: sid }));
     subscribeToClaims(sid);
     subscribeToSession(sid);
     setPhase("login");
@@ -1039,8 +1088,10 @@ export default function VibeShowdown() {
     setActiveVoter(voter);
     setRoundScores({});
     setMyVoteSubmitted(false);
-    // Only go to voting if presentation order is already set (late joiner scenario)
-    // Otherwise stay on login — the useEffect auto-transitions when order is ready
+
+    // Persist identity so refresh doesn't log out
+    localStorage.setItem(`vibe_voter_${sessionId}`, JSON.stringify({ voterName: voter, isCeo }));
+
     if (presentationOrder.length > 0) {
       setPhase("voting");
     }
@@ -2433,7 +2484,10 @@ export default function VibeShowdown() {
                   if (subscriptionRef.current) supabase.removeChannel(subscriptionRef.current);
                   if (sessionSubRef.current) supabase.removeChannel(sessionSubRef.current);
                   if (votesSubRef.current) supabase.removeChannel(votesSubRef.current);
+                  localStorage.removeItem("vibe_ceo_session");
+                  if (sessionId) localStorage.removeItem(`vibe_voter_${sessionId}`);
                   setSessionId(null);
+                  setActiveVoter(null);
                   setIsCeo(true);
                   setSessionLocked(false);
                   const url = new URL(window.location);
