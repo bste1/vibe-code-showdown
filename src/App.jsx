@@ -104,6 +104,22 @@ const INITIAL_PEOPLE = [
   "Rosie",
 ];
 
+const DEFAULT_PENALTIES = {
+  "Sam": "3 Roasted Lizards (unflavored with skin still attached) + Cheesy part of yogurt",
+  "Jonah": "1 lb of Blue Cheese",
+  "Rosie": "1 Tarantula — cooked (unflavored, unfried, still hairy)",
+  "David": "1 Tarantula — cooked (unflavored, unfried, still hairy)",
+  "Evan": "1 lb of Fish Eyes with level 5 spice (served room temp)",
+  "Andrew": "1 Tarantula (unflavored, unfried, still hairy), 1 lb of Blue Cheese, 3 Roasted Lizards, and 1 lb of Fish Eyes with level 5 spice",
+  "Taylor": "2 XL raw purple onions",
+  "Sandra": "1 Tarantula — cooked (unflavored, unfried, still hairy)",
+  "Mischa": "1 Frog (boiled, unflavored, no sauce, not skinned)",
+  "Andrea": "1 Frog (boiled, unflavored, no sauce, not skinned)",
+  "Drixter": "Balut",
+  "Paul": "Balut",
+  "Mildred": "1 Frog (boiled, unflavored, no sauce, not skinned)",
+};
+
 const AVATAR_COLORS = [
   "#FF6B6B",
   "#4ECDC4",
@@ -814,6 +830,9 @@ export default function VibeShowdown() {
   const [phase, setPhase] = useState("loading");
   const [people, setPeople] = useState(INITIAL_PEOPLE);
   const [addName, setAddName] = useState("");
+  const [penalties, setPenalties] = useState(DEFAULT_PENALTIES);
+  const [editingPenalty, setEditingPenalty] = useState(null);
+  const [penaltyDraft, setPenaltyDraft] = useState("");
   const [sessionId, setSessionId] = useState(null);
   const [isCeo, setIsCeo] = useState(false);
 
@@ -1581,63 +1600,78 @@ export default function VibeShowdown() {
                 </button>
               </div>
 
-              <div
-                style={{
-                  maxHeight: 340,
-                  overflowY: "auto",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 8,
-                }}
-              >
-                {people.map((p, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 40,
-                      padding: "6px 14px 6px 8px",
-                      fontSize: 13,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: "50%",
-                        background: AVATAR_COLORS[i % AVATAR_COLORS.length],
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 9,
-                        fontWeight: 900,
-                        color: "#000",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {initials(p)}
+              <div style={{ maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+                {people.map((p, i) => {
+                  const hasPenalty = !!penalties[p];
+                  const isEditing = editingPenalty === p;
+                  return (
+                    <div key={i}>
+                      <div
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8,
+                          background: isEditing ? "rgba(255,107,107,0.1)" : "rgba(255,255,255,0.06)",
+                          border: `1px solid ${isEditing ? "rgba(255,107,107,0.3)" : "rgba(255,255,255,0.1)"}`,
+                          borderRadius: 14, padding: "8px 12px 8px 8px", fontSize: 13,
+                          cursor: "pointer", transition: "all 0.15s",
+                        }}
+                        onDoubleClick={() => { setEditingPenalty(p); setPenaltyDraft(penalties[p] || ""); }}
+                        title={hasPenalty ? `Penalty: ${penalties[p]}` : "Double-click to add penalty"}
+                      >
+                        <div style={{
+                          width: 24, height: 24, borderRadius: "50%",
+                          background: AVATAR_COLORS[i % AVATAR_COLORS.length],
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 9, fontWeight: 900, color: "#000", flexShrink: 0,
+                        }}>{initials(p)}</div>
+                        <span style={{ color: "#fff", flex: 1 }}>{p}</span>
+                        <div style={{
+                          width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                          background: hasPenalty ? "#FF6B6B" : "rgba(255,255,255,0.15)",
+                          boxShadow: hasPenalty ? "0 0 6px rgba(255,107,107,0.5)" : "none",
+                        }} title={hasPenalty ? "Penalty assigned" : "No penalty"} />
+                        <span onClick={(e) => { e.stopPropagation(); setPeople((prev) => prev.filter((_, j) => j !== i)); }}
+                          style={{ cursor: "pointer", color: "rgba(255,255,255,0.3)", fontWeight: 700, lineHeight: 1, fontSize: 16 }}>×</span>
+                      </div>
+                      {hasPenalty && !isEditing && (
+                        <div style={{ fontSize: 11, color: "rgba(255,107,107,0.5)", padding: "2px 0 0 36px", fontStyle: "italic" }}>
+                          {penalties[p]}
+                        </div>
+                      )}
+                      {isEditing && (
+                        <div style={{ display: "flex", gap: 6, padding: "6px 0 0 36px" }}>
+                          <input
+                            autoFocus
+                            value={penaltyDraft}
+                            onChange={(e) => setPenaltyDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                setPenalties((prev) => ({ ...prev, [p]: penaltyDraft.trim() || undefined }));
+                                if (!penaltyDraft.trim()) setPenalties((prev) => { const n = { ...prev }; delete n[p]; return n; });
+                                setEditingPenalty(null);
+                              }
+                              if (e.key === "Escape") setEditingPenalty(null);
+                            }}
+                            placeholder="Type penalty... (Enter to save, Esc to cancel)"
+                            style={{
+                              flex: 1, background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.2)",
+                              borderRadius: 8, padding: "6px 10px", color: "#FF6B6B", fontFamily: "inherit",
+                              fontSize: 12, outline: "none",
+                            }}
+                          />
+                          <button onClick={() => {
+                            if (penaltyDraft.trim()) setPenalties((prev) => ({ ...prev, [p]: penaltyDraft.trim() }));
+                            else setPenalties((prev) => { const n = { ...prev }; delete n[p]; return n; });
+                            setEditingPenalty(null);
+                          }} style={{ ...S.btn("rgba(255,107,107,0.2)", "#FF6B6B"), padding: "4px 12px", fontSize: 11 }}>Save</button>
+                        </div>
+                      )}
                     </div>
-                    <span style={{ color: "#fff" }}>{p}</span>
-                    <span
-                      onClick={() =>
-                        setPeople((prev) => prev.filter((_, j) => j !== i))
-                      }
-                      style={{
-                        cursor: "pointer",
-                        color: "rgba(255,255,255,0.3)",
-                        fontWeight: 700,
-                        lineHeight: 1,
-                        fontSize: 16,
-                      }}
-                    >
-                      ×
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.25)" }}>
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#FF6B6B", marginRight: 4, verticalAlign: "middle" }} /> = penalty assigned.
+                Double-click a name to add/edit penalty.
               </div>
             </div>
 
@@ -2718,40 +2752,42 @@ export default function VibeShowdown() {
                         )}
 
                         {isLast && (
-                          <div
-                            style={{
-                              marginTop: 14,
-                              textAlign: "center",
-                              padding: "12px 16px",
-                              background: "rgba(255,50,50,0.08)",
-                              borderRadius: 12,
-                              border: "1px solid rgba(255,50,50,0.15)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 28,
-                                marginBottom: 6,
-                                animation:
-                                  "sadDrip 2s ease-in-out infinite",
-                              }}
-                            >
-                              😢🌧️💔
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 14,
-                                color: "#ff6b6b",
-                                fontStyle: "italic",
-                              }}
-                            >
-                              {
-                                SAD_QUOTES[
-                                  Math.floor(
-                                    Math.random() * SAD_QUOTES.length
-                                  )
-                                ]
-                              }
+                          <div style={{ marginTop: 14, textAlign: "center" }}>
+                            <div style={{
+                              padding: "16px 20px", background: "rgba(255,50,50,0.08)",
+                              borderRadius: 12, border: "1px solid rgba(255,50,50,0.15)", marginBottom: 8,
+                            }}>
+                              <div style={{ fontSize: 28, marginBottom: 6, animation: "sadDrip 2s ease-in-out infinite" }}>
+                                😢🌧️💔
+                              </div>
+                              <div style={{ fontSize: 14, color: "#ff6b6b", fontStyle: "italic", marginBottom: penalties[r.name] ? 12 : 0 }}>
+                                {SAD_QUOTES[Math.floor(Math.random() * SAD_QUOTES.length)]}
+                              </div>
+                              {penalties[r.name] && (
+                                <div style={{
+                                  marginTop: 8, padding: "14px 18px",
+                                  background: "linear-gradient(135deg, rgba(255,50,50,0.15), rgba(255,50,50,0.05))",
+                                  border: "2px solid rgba(255,50,50,0.4)", borderRadius: 14,
+                                  animation: "bounceIn 0.8s ease",
+                                }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 3, color: "rgba(255,50,50,0.5)", textTransform: "uppercase", marginBottom: 6 }}>
+                                    THE PENALTY
+                                  </div>
+                                  <div style={{
+                                    fontSize: 18, fontWeight: 900, color: "#FF6B6B", lineHeight: 1.4,
+                                  }}>
+                                    {r.name} must eat:
+                                  </div>
+                                  <div style={{
+                                    fontSize: 16, color: "#fff", fontWeight: 700, marginTop: 6, lineHeight: 1.5,
+                                    background: "linear-gradient(90deg, #FF6B6B, #ff9f43, #FF6B6B)",
+                                    backgroundSize: "200%", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                                    animation: "textShine 3s linear infinite",
+                                  }}>
+                                    {penalties[r.name]}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
