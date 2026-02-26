@@ -1806,7 +1806,7 @@ export default function VibeShowdown() {
   if (phase === "voting" && currentCandidate && activeVoter) {
     const candidateColor = AVATAR_COLORS[people.indexOf(currentCandidate) % AVATAR_COLORS.length];
     const voterColor = AVATAR_COLORS[people.indexOf(activeVoter) % AVATAR_COLORS.length] || "#888";
-    const isSelf = activeVoter === currentCandidate;
+    const isSelf = activeVoter === currentCandidate && activeVoter !== CEO_NAME;
 
     if (isSelf || myVoteSubmitted) {
       return (
@@ -1818,11 +1818,11 @@ export default function VibeShowdown() {
               {isSelf ? "🙈" : "✅"}
             </div>
             <h2 style={{ ...S.title, fontSize: 28, margin: 0 }}>
-              {isSelf ? "This is YOUR app!" : "Vote Submitted!"}
+              {isSelf ? `It's your turn, ${activeVoter}!` : "Vote Submitted!"}
             </h2>
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 16, maxWidth: 400, lineHeight: 1.5, margin: 0 }}>
               {isSelf
-                ? "You can't vote on your own app. Sit tight while everyone else votes."
+                ? "You can't vote on your own app. Sit back and enjoy while everyone else rates you!"
                 : "Your scores are locked in. Waiting for everyone else..."}
             </p>
 
