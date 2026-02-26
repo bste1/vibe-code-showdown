@@ -993,12 +993,25 @@ export default function VibeShowdown() {
     }
   }, [phase, activeVoter, presentationOrder]);
 
-  // When round changes or voting starts, subscribe to votes for current candidate
+  // When round changes or voting starts, subscribe to votes and check if already voted
   useEffect(() => {
     if (phase === "voting" && sessionId && currentCandidate) {
       const votersForCandidate = voterOrder.filter((p) => p !== currentCandidate);
       setTotalVoters(votersForCandidate.length);
       subscribeToVotes(sessionId, currentCandidate);
+
+      if (activeVoter) {
+        supabase
+          .from("votes")
+          .select("id")
+          .eq("session_id", sessionId)
+          .eq("voter_name", activeVoter)
+          .eq("participant_name", currentCandidate)
+          .limit(1)
+          .then(({ data }) => {
+            setMyVoteSubmitted(data && data.length > 0);
+          });
+      }
     }
   }, [phase, sessionId, currentRound, currentCandidate]);
 
@@ -1052,11 +1065,14 @@ export default function VibeShowdown() {
 
   async function onWheelComplete(orderedNames) {
     setPresentationOrder(orderedNames);
+    setCurrentRound(0);
+    setMyVoteSubmitted(false);
+    setRoundScores({});
+    setRoundVoteCount(0);
     await supabase
       .from("sessions")
       .update({ presentation_order: orderedNames, current_round: 0, phase: "voting" })
       .eq("id", sessionId);
-    setCurrentRound(0);
     setPhase("voting");
   }
 
