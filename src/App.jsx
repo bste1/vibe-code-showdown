@@ -80,6 +80,8 @@ const CATEGORIES = [
   },
 ];
 
+const CEO_NAME = "Ben";
+
 const INITIAL_PEOPLE = [
   "Andrea",
   "Andrew",
@@ -100,6 +102,7 @@ const INITIAL_PEOPLE = [
   "Ren",
   "Rod",
   "Rosie",
+  CEO_NAME,
 ];
 
 const AVATAR_COLORS = [
@@ -1574,31 +1577,45 @@ export default function VibeShowdown() {
               const disabled = claimed || lockedOut;
               const i = people.indexOf(p);
               const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
+              const isCeoName = p === CEO_NAME;
               return (
                 <button key={p} onClick={() => !disabled && requestVoting(p)} disabled={disabled}
                   style={{
-                    background: disabled ? "rgba(255,255,255,0.04)" : `linear-gradient(135deg, ${color}22, ${color}11)`,
-                    border: claimed ? "2px dashed rgba(78,205,196,0.3)" : lockedOut ? "1px solid rgba(255,255,255,0.07)" : `2px solid ${color}55`,
+                    background: disabled
+                      ? "rgba(255,255,255,0.04)"
+                      : isCeoName
+                        ? "linear-gradient(135deg, rgba(255,230,109,0.15), rgba(255,107,107,0.1))"
+                        : `linear-gradient(135deg, ${color}22, ${color}11)`,
+                    border: claimed
+                      ? isCeoName ? "2px solid rgba(255,230,109,0.5)" : "2px dashed rgba(78,205,196,0.3)"
+                      : lockedOut ? "1px solid rgba(255,255,255,0.07)"
+                      : isCeoName ? "2px solid rgba(255,230,109,0.6)" : `2px solid ${color}55`,
                     borderRadius: 18, padding: "18px 14px", cursor: disabled ? "default" : "pointer",
                     textAlign: "center", transition: "transform 0.15s, box-shadow 0.15s",
-                    opacity: disabled ? 0.5 : 1, fontFamily: "inherit",
+                    opacity: disabled ? (claimed ? 0.7 : 0.5) : 1, fontFamily: "inherit",
+                    boxShadow: isCeoName && !disabled ? "0 0 20px rgba(255,230,109,0.2)" : "none",
                   }}
                   onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.transform = "translateY(-4px)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
                 >
                   <div style={{
                     width: 52, height: 52, borderRadius: "50%",
-                    background: claimed ? "rgba(78,205,196,0.2)" : lockedOut ? "rgba(255,255,255,0.06)" : color,
+                    background: claimed
+                      ? isCeoName ? "linear-gradient(135deg, rgba(255,230,109,0.3), rgba(255,107,107,0.2))" : "rgba(78,205,196,0.2)"
+                      : lockedOut ? "rgba(255,255,255,0.06)"
+                      : isCeoName ? "linear-gradient(135deg, #FFE66D, #FF6B6B)" : color,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    margin: "0 auto 10px", fontSize: 18, fontWeight: 900,
-                    color: disabled ? "rgba(255,255,255,0.3)" : "#000",
-                    boxShadow: disabled ? "none" : `0 4px 16px ${color}66`,
+                    margin: "0 auto 10px", fontSize: isCeoName && !claimed ? 22 : 18, fontWeight: 900,
+                    color: disabled ? (isCeoName && claimed ? "rgba(255,230,109,0.6)" : "rgba(255,255,255,0.3)") : "#000",
+                    boxShadow: isCeoName && !disabled ? "0 4px 16px rgba(255,230,109,0.4)" : disabled ? "none" : `0 4px 16px ${color}66`,
                   }}>
-                    {claimed ? "✓" : lockedOut ? "✕" : initials(p)}
+                    {claimed ? (isCeoName ? "👑" : "✓") : lockedOut ? "✕" : isCeoName ? "👑" : initials(p)}
                   </div>
-                  <div style={{ color: disabled ? "rgba(255,255,255,0.3)" : "#fff", fontWeight: 700, fontSize: 14 }}>{p}</div>
-                  <div style={{ fontSize: 11, color: claimed ? "#4ECDC4" : lockedOut ? "#FF6B6B" : "rgba(255,255,255,0.35)", marginTop: 4 }}>
-                    {claimed ? "Joined ✅" : lockedOut ? "Locked out" : "🔒 Tap to join"}
+                  <div style={{ color: isCeoName ? (disabled ? "rgba(255,230,109,0.5)" : "#FFE66D") : (disabled ? "rgba(255,255,255,0.3)" : "#fff"), fontWeight: 700, fontSize: 14 }}>
+                    {p}{isCeoName ? " — CEO" : ""}
+                  </div>
+                  <div style={{ fontSize: 11, color: claimed ? (isCeoName ? "#FFE66D" : "#4ECDC4") : lockedOut ? "#FF6B6B" : "rgba(255,255,255,0.35)", marginTop: 4 }}>
+                    {claimed ? (isCeoName ? "CEO Joined 👑" : "Joined ✅") : lockedOut ? "Locked out" : isCeoName ? "👑 Tap to join (CEO)" : "🔒 Tap to join"}
                   </div>
                 </button>
               );
