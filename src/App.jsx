@@ -157,7 +157,7 @@ function shuffle(arr) {
   return a;
 }
 
-/* ─── CONFETTI ──────────────────────────────────────────────────── */
+/* ─── CONFETTI (massive version) ─────────────────────────────── */
 function Confetti({ active }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
@@ -168,58 +168,53 @@ function Confetti({ active }) {
     const ctx = canvas.getContext("2d");
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const shapes = ["rect", "circle", "star"];
-    const pieces = Array.from({ length: 200 }, () => ({
+    const colors = ["#FF6B6B","#4ECDC4","#FFE66D","#FF9FF3","#54A0FF","#5F27CD","#00D2D3","#FFD700","#FF6348","#A8EDEA","#f368e0","#ff9f43","#ee5a24","#7bed9f"];
+    const makePiece = () => ({
       x: Math.random() * canvas.width,
-      y: -20 - Math.random() * 200,
-      vx: (Math.random() - 0.5) * 8,
-      vy: Math.random() * 5 + 3,
-      r: Math.random() * 10 + 4,
-      color: [
-        "#FF6B6B",
-        "#4ECDC4",
-        "#FFE66D",
-        "#A8EDEA",
-        "#FF9FF3",
-        "#54A0FF",
-        "#5F27CD",
-        "#00D2D3",
-        "#FFD700",
-        "#FF6348",
-      ][Math.floor(Math.random() * 10)],
+      y: -20 - Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 12,
+      vy: Math.random() * 4 + 2,
+      r: Math.random() * 12 + 4,
+      color: colors[Math.floor(Math.random() * colors.length)],
       angle: Math.random() * Math.PI * 2,
-      spin: (Math.random() - 0.5) * 0.3,
-      shape: shapes[Math.floor(Math.random() * 3)],
-    }));
+      spin: (Math.random() - 0.5) * 0.4,
+      type: Math.floor(Math.random() * 4),
+      wobble: Math.random() * 10,
+      wobbleSpeed: Math.random() * 0.1 + 0.03,
+    });
+    const pieces = Array.from({ length: 500 }, makePiece);
+    let frame = 0;
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      pieces.forEach((p) => {
+      frame++;
+      pieces.forEach((p, i) => {
+        p.wobble += p.wobbleSpeed;
         ctx.save();
-        ctx.translate(p.x, p.y);
+        ctx.translate(p.x + Math.sin(p.wobble) * 3, p.y);
         ctx.rotate(p.angle);
+        ctx.globalAlpha = Math.min(1, Math.max(0, 1 - (p.y - canvas.height + 100) / 100));
         ctx.fillStyle = p.color;
-        if (p.shape === "rect") {
-          ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6);
-        } else if (p.shape === "circle") {
+        if (p.type === 0) { ctx.fillRect(-p.r/2, -p.r/2, p.r, p.r * 0.5); }
+        else if (p.type === 1) { ctx.beginPath(); ctx.arc(0, 0, p.r/2, 0, Math.PI * 2); ctx.fill(); }
+        else if (p.type === 2) { ctx.fillRect(-p.r/2, -1, p.r, 3); }
+        else {
           ctx.beginPath();
-          ctx.arc(0, 0, p.r / 2, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.beginPath();
-          for (let i = 0; i < 5; i++) {
-            const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-            const method = i === 0 ? "moveTo" : "lineTo";
-            ctx[method](Math.cos(a) * p.r * 0.5, Math.sin(a) * p.r * 0.5);
+          for (let j = 0; j < 5; j++) {
+            const a = (j * 4 * Math.PI) / 5 - Math.PI / 2;
+            ctx[j === 0 ? "moveTo" : "lineTo"](Math.cos(a) * p.r * 0.5, Math.sin(a) * p.r * 0.5);
           }
-          ctx.closePath();
-          ctx.fill();
+          ctx.closePath(); ctx.fill();
         }
         ctx.restore();
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.06;
-        p.vx *= 0.99;
+        p.vy += 0.04;
+        p.vx *= 0.995;
         p.angle += p.spin;
+        if (p.y > canvas.height + 50) {
+          Object.assign(pieces[i], makePiece());
+          pieces[i].y = -20 - Math.random() * 50;
+        }
       });
       animRef.current = requestAnimationFrame(draw);
     };
@@ -227,16 +222,33 @@ function Confetti({ active }) {
     return () => cancelAnimationFrame(animRef.current);
   }, [active]);
   if (!active) return null;
+  return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }} />;
+}
+
+/* ─── COUNTDOWN REVEAL ───────────────────────────────────────── */
+function CountdownReveal({ onComplete, label }) {
+  const [count, setCount] = useState(3);
+  useEffect(() => {
+    if (count <= 0) { onComplete(); return; }
+    const t = setTimeout(() => setCount((c) => c - 1), 900);
+    return () => clearTimeout(t);
+  }, [count, onComplete]);
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: "fixed",
-        inset: 0,
-        pointerEvents: "none",
-        zIndex: 9999,
-      }}
-    />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 3, color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>{label}</div>
+      <div style={{
+        fontSize: count > 0 ? 120 : 60, fontWeight: 900, color: "#FFD700",
+        animation: "bounceIn 0.4s ease", key: count,
+        textShadow: "0 0 40px rgba(255,215,0,0.6), 0 0 80px rgba(255,215,0,0.3)",
+      }}>
+        {count > 0 ? count : ""}
+      </div>
+      {count <= 0 && (
+        <div style={{ fontSize: 28, fontWeight: 900, color: "#FFD700", animation: "bounceIn 0.5s ease", letterSpacing: 4 }}>
+          REVEAL!
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1784,7 +1796,10 @@ export default function VibeShowdown() {
   /* ═══════════════════════════════════════════════════════════════
      PHASE: PRIZES — Reveal prizes before spinning (CEO scratches)
   ═══════════════════════════════════════════════════════════════ */
-  if (phase === "prizes")
+  if (phase === "prizes") {
+    const cardBase = { borderRadius: 24, overflow: "hidden", backdropFilter: "blur(12px)" };
+    const iconBox = (bg) => ({ width: 56, height: 56, borderRadius: 16, background: bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" });
+
     return (
       <div style={S.root}>
         <StarBg />
@@ -1792,102 +1807,101 @@ export default function VibeShowdown() {
         <Confetti active={confetti} />
         <UnicornCelebration active={unicorns} />
         <div style={S.page}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <div style={{ fontSize: 56, marginBottom: 8 }}>🎁🏆🎁</div>
-            <h1 style={{ ...S.title, fontSize: 38, margin: 0 }}>
-              {isCeo ? "REVEAL THE PRIZES" : "PRIZES BEING REVEALED..."}
+          <div style={{ textAlign: "center", marginBottom: 36 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 4, color: "rgba(255,215,0,0.5)", textTransform: "uppercase", marginBottom: 8 }}>TENKARA AI VIBE CODE SHOWDOWN</div>
+            <h1 style={{ ...S.title, fontSize: 40, margin: 0 }}>
+              WHAT YOU'RE PLAYING FOR
             </h1>
             <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 15, margin: "8px 0 0" }}>
-              {isCeo ? "Scratch each card to show the team what they're playing for!" : "Watch as the prizes are revealed..."}
+              Three prizes. Three reveals. Let's see what's on the line.
             </p>
           </div>
 
-          <div style={{ maxWidth: 700, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ maxWidth: 740, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
 
-            {/* ════════ FIRST PLACE PRIZE ════════ */}
-            <div style={{ borderRadius: 24, overflow: "hidden", border: `2px solid ${prizePhase >= 3 ? "rgba(255,215,0,0.8)" : "rgba(255,215,0,0.3)"}`, background: "rgba(255,215,0,0.04)", animation: prizePhase >= 3 ? "prizeGlow 3s ease-in-out infinite" : "none" }}>
-              <div style={{ padding: "24px", textAlign: "center" }}>
-                <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3, color: "rgba(255,215,0,0.6)", textTransform: "uppercase", marginBottom: 16 }}>🥇 THE GRAND PRIZE 🥇</div>
+            {/* ════════ FIRST PLACE ════════ */}
+            <div style={{ ...cardBase, border: `2px solid ${prizePhase >= 3 ? "rgba(255,215,0,0.7)" : "rgba(255,215,0,0.2)"}`, background: prizePhase >= 3 ? "rgba(255,215,0,0.06)" : "rgba(255,255,255,0.03)", animation: prizePhase >= 3 ? "prizeGlow 3s ease-in-out infinite" : "none" }}>
+              <div style={{ padding: 28, textAlign: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+                  <div style={{ width: 40, height: 2, background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.5))" }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 4, color: "rgba(255,215,0,0.6)", textTransform: "uppercase" }}>FIRST PLACE</span>
+                  <div style={{ width: 40, height: 2, background: "linear-gradient(90deg, rgba(255,215,0,0.5), transparent)" }} />
+                </div>
+
                 {prizePhase === 1 && isCeo && (
-                  <button onClick={() => setPrizePhase(2)} style={{ ...S.btn("linear-gradient(135deg, #FFD700, #FF6B6B, #FFD700)"), fontSize: 20, padding: "18px 48px", marginBottom: 8, animation: "pulse 2s ease-in-out infinite", boxShadow: "0 8px 40px rgba(255,215,0,0.4)" }}>
-                    🎰 Scratch to Reveal the Grand Prize!
+                  <button onClick={() => setPrizePhase(2)} style={{ ...S.btn("linear-gradient(135deg, #FFD700, #b8860b, #FFD700)","#000"), fontSize: 20, padding: "20px 56px", animation: "pulse 2s ease-in-out infinite", boxShadow: "0 8px 48px rgba(255,215,0,0.4)", letterSpacing: 2 }}>
+                    REVEAL GRAND PRIZE
                   </button>
                 )}
-                {prizePhase === 2 && (
-                  <ScratchCard width={660} height={240} color="gold" onComplete={() => { setPrizePhase(3); setConfetti(true); setUnicorns(true); setTimeout(() => { setConfetti(false); setUnicorns(false); }, 10000); }}>
-                    <div style={{ textAlign: "center", width: "100%", padding: "0 20px" }}>
-                      <div style={{ fontSize: 42, marginBottom: 8 }}>✈️🌴🏖️</div>
-                      <div style={{ fontSize: 24, fontWeight: 900, color: "#FFD700", lineHeight: 1.2 }}>ALL-EXPENSE PAID TRIP TO VIETNAM</div>
-                      <div style={{ fontSize: 15, color: "#FFE66D", fontWeight: 700, marginTop: 6 }}>Four Seasons Nam Hai, Hoi An | You + a +1 | $1,200 Cash</div>
-                    </div>
-                  </ScratchCard>
+                {prizePhase === 1 && !isCeo && (
+                  <div style={{ padding: 40, color: "rgba(255,255,255,0.3)", fontSize: 15 }}>Waiting for the reveal...</div>
                 )}
-                {prizePhase < 2 && !isCeo && <div style={{ fontSize: 64, padding: 30 }}>🎁✨🎁</div>}
+                {prizePhase === 2 && (
+                  <CountdownReveal label="THE GRAND PRIZE IS..." onComplete={() => { setPrizePhase(3); setConfetti(true); setUnicorns(true); setTimeout(() => { setConfetti(false); setUnicorns(false); }, 15000); }} />
+                )}
                 {prizePhase >= 3 && (
                   <div style={{ animation: "bounceIn 0.8s ease" }}>
-                    {/* Hero images */}
-                    <div style={{ display: "flex", gap: 12, marginBottom: 20, borderRadius: 16, overflow: "hidden" }}>
-                      <div style={{ flex: 1, height: 200, borderRadius: 16, overflow: "hidden", position: "relative" }}>
+                    <div style={{ display: "flex", gap: 12, marginBottom: 24, borderRadius: 16, overflow: "hidden" }}>
+                      <div style={{ flex: 1, height: 220, borderRadius: 16, overflow: "hidden", position: "relative" }}>
                         <img src="/images/fourseasons-beach.png" alt="Four Seasons Beach" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 12px 10px", background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
-                          <div style={{ color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>BEACHFRONT PARADISE</div>
+                        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "30px 14px 12px", background: "linear-gradient(transparent, rgba(0,0,0,0.8))" }}>
+                          <div style={{ color: "#FFD700", fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>BEACHFRONT LOUNGE</div>
                         </div>
                       </div>
-                      <div style={{ flex: 1, height: 200, borderRadius: 16, overflow: "hidden", position: "relative" }}>
+                      <div style={{ flex: 1, height: 220, borderRadius: 16, overflow: "hidden", position: "relative" }}>
                         <img src="/images/fourseasons-pool.png" alt="Four Seasons Pool Villa" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 12px 10px", background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
-                          <div style={{ color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>PRIVATE POOL VILLA</div>
+                        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "30px 14px 12px", background: "linear-gradient(transparent, rgba(0,0,0,0.8))" }}>
+                          <div style={{ color: "#FFD700", fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>PRIVATE POOL VILLA</div>
                         </div>
                       </div>
                     </div>
 
-                    <div style={{ fontSize: 52, marginBottom: 8 }}>✈️🌴🏖️🌏</div>
                     <div style={{
-                      fontSize: 32, fontWeight: 900,
-                      background: "linear-gradient(90deg, #FFD700, #FF6B6B, #FFD700, #4ECDC4, #FFD700)",
+                      fontSize: 36, fontWeight: 900, lineHeight: 1.1, marginBottom: 6,
+                      background: "linear-gradient(90deg, #FFD700, #fff, #FFD700, #b8860b, #FFD700)",
                       backgroundSize: "200%", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                      animation: "textShine 3s linear infinite", lineHeight: 1.2, marginBottom: 8,
-                    }}>ALL-EXPENSE PAID TRIP TO VIETNAM</div>
-                    <div style={{ fontSize: 20, color: "#FFE66D", fontWeight: 800, marginBottom: 20, letterSpacing: 1 }}>
-                      FOR YOU AND A +1
-                    </div>
+                      animation: "textShine 3s linear infinite",
+                    }}>ALL-EXPENSE PAID TRIP<br/>TO VIETNAM</div>
+                    <div style={{ fontSize: 16, color: "rgba(255,255,255,0.5)", fontWeight: 600, marginBottom: 24, letterSpacing: 1 }}>FOR YOU AND A +1</div>
 
-                    {/* Premium detail cards */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                      <div style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.12), rgba(255,215,0,0.04))", border: "1px solid rgba(255,215,0,0.3)", borderRadius: 16, padding: "18px 16px", textAlign: "center" }}>
-                        <div style={{ fontSize: 32, marginBottom: 6 }}>🏨</div>
-                        <div style={{ color: "#FFD700", fontWeight: 900, fontSize: 18, marginBottom: 2 }}>Four Seasons</div>
-                        <div style={{ color: "#FFE66D", fontWeight: 700, fontSize: 14 }}>The Nam Hai</div>
-                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginTop: 4 }}>Hoi An, Vietnam</div>
-                        <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>World-class luxury resort</div>
-                      </div>
-                      <div style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.12), rgba(255,215,0,0.04))", border: "1px solid rgba(255,215,0,0.3)", borderRadius: 16, padding: "18px 16px", textAlign: "center" }}>
-                        <div style={{ fontSize: 32, marginBottom: 6 }}>🌙</div>
-                        <div style={{ color: "#FFD700", fontWeight: 900, fontSize: 18, marginBottom: 2 }}>4 Nights</div>
-                        <div style={{ color: "#FFE66D", fontWeight: 700, fontSize: 14 }}>5 Days</div>
-                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginTop: 4 }}>Full luxury stay</div>
-                        <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>Pool villa, daily breakfast included</div>
+                    {/* Four Seasons branding */}
+                    <div style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.08), rgba(0,0,0,0.3))", border: "1px solid rgba(255,215,0,0.25)", borderRadius: 20, padding: "24px 20px", marginBottom: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 6, color: "rgba(255,215,0,0.5)", textTransform: "uppercase", marginBottom: 12 }}>FOUR SEASONS</div>
+                      <div style={{ color: "#FFD700", fontWeight: 900, fontSize: 22, marginBottom: 4 }}>The Nam Hai</div>
+                      <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 14 }}>Hoi An, Vietnam</div>
+                      <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, marginTop: 8, lineHeight: 1.5, maxWidth: 400, margin: "8px auto 0" }}>
+                        Private pool villa on the beach. Daily breakfast at Caf&eacute; Nam Hai. Personal attendant. Complimentary laundry. World-class spa & wellness.
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <div style={{ background: "linear-gradient(135deg, rgba(78,205,196,0.15), rgba(78,205,196,0.04))", border: "1px solid rgba(78,205,196,0.3)", borderRadius: 16, padding: "18px 16px", textAlign: "center" }}>
-                        <div style={{ fontSize: 32, marginBottom: 6 }}>✈️</div>
-                        <div style={{ color: "#4ECDC4", fontWeight: 900, fontSize: 18, marginBottom: 2 }}>Flights Covered</div>
-                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginTop: 4 }}>Round-trip airfare for two</div>
-                        <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>All expenses paid</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                      <div style={{ background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 16, padding: "20px 12px", textAlign: "center" }}>
+                        <div style={iconBox("linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.05)")}>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
+                        </div>
+                        <div style={{ color: "#FFD700", fontWeight: 800, fontSize: 20 }}>4 Nights</div>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>5 Days of luxury</div>
                       </div>
-                      <div style={{ background: "linear-gradient(135deg, rgba(255,107,107,0.15), rgba(255,107,107,0.04))", border: "1px solid rgba(255,107,107,0.3)", borderRadius: 16, padding: "18px 16px", textAlign: "center", position: "relative", overflow: "hidden" }}>
-                        <div style={{ fontSize: 32, marginBottom: 6 }}>💸</div>
+                      <div style={{ background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.2)", borderRadius: 16, padding: "20px 12px", textAlign: "center" }}>
+                        <div style={iconBox("linear-gradient(135deg, rgba(78,205,196,0.2), rgba(78,205,196,0.05)")}>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+                        </div>
+                        <div style={{ color: "#4ECDC4", fontWeight: 800, fontSize: 16 }}>First Class</div>
+                        <div style={{ color: "#4ECDC4", fontWeight: 800, fontSize: 16 }}>Flights</div>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>Round-trip for two</div>
+                      </div>
+                      <div style={{ background: "rgba(255,107,107,0.06)", border: "1px solid rgba(255,107,107,0.2)", borderRadius: 16, padding: "20px 12px", textAlign: "center" }}>
+                        <div style={iconBox("linear-gradient(135deg, rgba(255,107,107,0.2), rgba(255,107,107,0.05)")}>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                        </div>
                         <div style={{
-                          color: "#FF6B6B", fontWeight: 900, fontSize: 28, marginBottom: 2,
+                          fontWeight: 900, fontSize: 24,
                           background: "linear-gradient(90deg, #FFD700, #FF6B6B, #FFD700)",
                           backgroundSize: "200%", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                           animation: "textShine 2s linear infinite",
                         }}>$1,200</div>
-                        <div style={{ color: "#FF6B6B", fontWeight: 700, fontSize: 14 }}>POCKET CASH</div>
-                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginTop: 4 }}>For food, drinks & adventures</div>
-                        <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>Spend it however you want</div>
+                        <div style={{ color: "#FF6B6B", fontWeight: 700, fontSize: 13 }}>POCKET CASH</div>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>Food, drinks, adventures</div>
                       </div>
                     </div>
                   </div>
@@ -1895,61 +1909,66 @@ export default function VibeShowdown() {
               </div>
             </div>
 
-            {/* ════════ SECOND PLACE PRIZE ════════ */}
+            {/* ════════ SECOND PLACE ════════ */}
             {prizePhase >= 3 && (
-              <div style={{ borderRadius: 24, overflow: "hidden", border: `2px solid ${prizePhase >= 5 ? "rgba(192,192,192,0.6)" : "rgba(192,192,192,0.3)"}`, background: "rgba(192,192,192,0.04)", animation: prizePhase >= 5 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
-                <div style={{ padding: "24px", textAlign: "center" }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3, color: "rgba(192,192,192,0.6)", textTransform: "uppercase", marginBottom: 16 }}>🥈 Second Place 🥈</div>
+              <div style={{ ...cardBase, border: `2px solid ${prizePhase >= 5 ? "rgba(192,192,192,0.5)" : "rgba(192,192,192,0.2)"}`, background: prizePhase >= 5 ? "rgba(192,192,192,0.04)" : "rgba(255,255,255,0.03)", animation: prizePhase >= 5 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
+                <div style={{ padding: 28, textAlign: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+                    <div style={{ width: 40, height: 2, background: "linear-gradient(90deg, transparent, rgba(192,192,192,0.5))" }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 4, color: "rgba(192,192,192,0.6)", textTransform: "uppercase" }}>SECOND PLACE</span>
+                    <div style={{ width: 40, height: 2, background: "linear-gradient(90deg, rgba(192,192,192,0.5), transparent)" }} />
+                  </div>
                   {prizePhase === 3 && isCeo && (
-                    <button onClick={() => setPrizePhase(4)} style={{ ...S.btn("linear-gradient(135deg, #C0C0C0, #45B7D1)"), fontSize: 18, padding: "14px 40px", marginBottom: 8, animation: "pulse 2s ease-in-out infinite" }}>
-                      🎰 Scratch to Reveal!
+                    <button onClick={() => setPrizePhase(4)} style={{ ...S.btn("linear-gradient(135deg, #C0C0C0, #708090, #C0C0C0)","#000"), fontSize: 18, padding: "16px 44px", animation: "pulse 2s ease-in-out infinite", letterSpacing: 2 }}>
+                      REVEAL 2ND PLACE PRIZE
                     </button>
                   )}
-                  {prizePhase === 4 && (
-                    <ScratchCard width={660} height={180} color="silver" onComplete={() => { setPrizePhase(5); setConfetti(true); setTimeout(() => setConfetti(false), 6000); }}>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 42 }}>📱</div>
-                        <div style={{ fontSize: 24, fontWeight: 900, color: "#C0C0C0" }}>BRAND NEW iPAD</div>
-                      </div>
-                    </ScratchCard>
+                  {prizePhase === 3 && !isCeo && (
+                    <div style={{ padding: 30, color: "rgba(255,255,255,0.3)", fontSize: 15 }}>Waiting for the reveal...</div>
                   )}
-                  {prizePhase < 4 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
+                  {prizePhase === 4 && (
+                    <CountdownReveal label="SECOND PLACE WINS..." onComplete={() => { setPrizePhase(5); setConfetti(true); setTimeout(() => setConfetti(false), 8000); }} />
+                  )}
                   {prizePhase >= 5 && (
                     <div style={{ animation: "bounceIn 0.8s ease" }}>
-                      <div style={{ fontSize: 56, marginBottom: 10 }}>📱</div>
-                      <div style={{ fontSize: 28, fontWeight: 900, color: "#C0C0C0", marginBottom: 4 }}>Brand New iPad</div>
-                      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 16 }}>Latest model, fresh out the box</div>
+                      <div style={iconBox("linear-gradient(135deg, rgba(192,192,192,0.2), rgba(192,192,192,0.05)")}>
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C0C0C0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                      </div>
+                      <div style={{ fontSize: 30, fontWeight: 900, color: "#C0C0C0", marginBottom: 4 }}>Brand New iPad</div>
+                      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 15 }}>Latest generation, sealed in box</div>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* ════════ THIRD PLACE PRIZE ════════ */}
+            {/* ════════ THIRD PLACE ════════ */}
             {prizePhase >= 5 && (
-              <div style={{ borderRadius: 24, overflow: "hidden", border: `2px solid ${prizePhase >= 7 ? "rgba(205,127,50,0.6)" : "rgba(205,127,50,0.3)"}`, background: "rgba(205,127,50,0.04)", animation: prizePhase >= 7 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
-                <div style={{ padding: "24px", textAlign: "center" }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3, color: "rgba(205,127,50,0.6)", textTransform: "uppercase", marginBottom: 16 }}>🥉 Third Place 🥉</div>
+              <div style={{ ...cardBase, border: `2px solid ${prizePhase >= 7 ? "rgba(205,127,50,0.5)" : "rgba(205,127,50,0.2)"}`, background: prizePhase >= 7 ? "rgba(205,127,50,0.04)" : "rgba(255,255,255,0.03)", animation: prizePhase >= 7 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
+                <div style={{ padding: 28, textAlign: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+                    <div style={{ width: 40, height: 2, background: "linear-gradient(90deg, transparent, rgba(205,127,50,0.5))" }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 4, color: "rgba(205,127,50,0.6)", textTransform: "uppercase" }}>THIRD PLACE</span>
+                    <div style={{ width: 40, height: 2, background: "linear-gradient(90deg, rgba(205,127,50,0.5), transparent)" }} />
+                  </div>
                   {prizePhase === 5 && isCeo && (
-                    <button onClick={() => setPrizePhase(6)} style={{ ...S.btn("linear-gradient(135deg, #CD7F32, #96CEB4)"), fontSize: 18, padding: "14px 40px", marginBottom: 8, animation: "pulse 2s ease-in-out infinite" }}>
-                      🎰 Scratch to Reveal!
+                    <button onClick={() => setPrizePhase(6)} style={{ ...S.btn("linear-gradient(135deg, #CD7F32, #8b4513, #CD7F32)","#fff"), fontSize: 18, padding: "16px 44px", animation: "pulse 2s ease-in-out infinite", letterSpacing: 2 }}>
+                      REVEAL 3RD PLACE PRIZE
                     </button>
                   )}
-                  {prizePhase === 6 && (
-                    <ScratchCard width={660} height={180} color="bronze" onComplete={() => { setPrizePhase(7); setConfetti(true); setTimeout(() => setConfetti(false), 5000); }}>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 42 }}>🎣</div>
-                        <div style={{ fontSize: 24, fontWeight: 900, color: "#CD7F32" }}>A REAL TENKARA</div>
-                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>In the spirit of Tenkara AI</div>
-                      </div>
-                    </ScratchCard>
+                  {prizePhase === 5 && !isCeo && (
+                    <div style={{ padding: 30, color: "rgba(255,255,255,0.3)", fontSize: 15 }}>Waiting for the reveal...</div>
                   )}
-                  {prizePhase < 6 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
+                  {prizePhase === 6 && (
+                    <CountdownReveal label="THIRD PLACE WINS..." onComplete={() => { setPrizePhase(7); setConfetti(true); setTimeout(() => setConfetti(false), 6000); }} />
+                  )}
                   {prizePhase >= 7 && (
                     <div style={{ animation: "bounceIn 0.8s ease" }}>
-                      <div style={{ fontSize: 56, marginBottom: 10 }}>🎣</div>
-                      <div style={{ fontSize: 28, fontWeight: 900, color: "#CD7F32", marginBottom: 4 }}>A Real Tenkara</div>
-                      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 16 }}>In the spirit of Tenkara AI</div>
+                      <div style={iconBox("linear-gradient(135deg, rgba(205,127,50,0.2), rgba(205,127,50,0.05)")}>
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#CD7F32" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                      </div>
+                      <div style={{ fontSize: 30, fontWeight: 900, color: "#CD7F32", marginBottom: 4 }}>A Real Tenkara</div>
+                      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 15 }}>In the spirit of Tenkara AI</div>
                     </div>
                   )}
                 </div>
@@ -1961,7 +1980,7 @@ export default function VibeShowdown() {
               <div style={{ textAlign: "center", marginTop: 16 }}>
                 <button onClick={startSpinFromPrizes}
                   style={{ ...S.btn("linear-gradient(135deg, #FFE66D, #FF6B6B)"), fontSize: 22, padding: "20px 56px", animation: "pulse 2s ease-in-out infinite", boxShadow: "0 8px 40px rgba(255,230,109,0.4)" }}>
-                  🎡 Now Let's Spin the Wheel!
+                  LET'S SPIN THE WHEEL
                 </button>
               </div>
             )}
@@ -1969,6 +1988,7 @@ export default function VibeShowdown() {
         </div>
       </div>
     );
+  }
 
   /* ═══════════════════════════════════════════════════════════════
      PHASE: SPIN — Wheel determines presentation order (CEO only)
