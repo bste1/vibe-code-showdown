@@ -225,29 +225,80 @@ function Confetti({ active }) {
   return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }} />;
 }
 
-/* ─── COUNTDOWN REVEAL ───────────────────────────────────────── */
+/* ─── COUNTDOWN REVEAL (dramatic 3-2-1 with fizzle dissolve) ── */
 function CountdownReveal({ onComplete, label }) {
-  const [count, setCount] = useState(3);
+  const [stage, setStage] = useState("label");
+  const [num, setNum] = useState(3);
+  const [fizzle, setFizzle] = useState(false);
+  const timerRef = useRef(null);
+
   useEffect(() => {
-    if (count <= 0) { onComplete(); return; }
-    const t = setTimeout(() => setCount((c) => c - 1), 900);
-    return () => clearTimeout(t);
-  }, [count, onComplete]);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 3, color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>{label}</div>
-      <div style={{
-        fontSize: count > 0 ? 120 : 60, fontWeight: 900, color: "#FFD700",
-        animation: "bounceIn 0.4s ease", key: count,
-        textShadow: "0 0 40px rgba(255,215,0,0.6), 0 0 80px rgba(255,215,0,0.3)",
-      }}>
-        {count > 0 ? count : ""}
+    const seq = [
+      () => setStage("counting"),
+      () => setNum(3),
+      2000,
+      () => setNum(2),
+      2000,
+      () => setNum(1),
+      2000,
+      () => { setStage("fizzle"); setFizzle(true); },
+      1200,
+      () => onComplete(),
+    ];
+    let i = 0;
+    const next = () => {
+      if (i >= seq.length) return;
+      const step = seq[i];
+      i++;
+      if (typeof step === "function") { step(); next(); }
+      else { timerRef.current = setTimeout(next, step); }
+    };
+    timerRef.current = setTimeout(next, 800);
+    return () => clearTimeout(timerRef.current);
+  }, [onComplete]);
+
+  if (stage === "label") {
+    return (
+      <div style={{ padding: 60, textAlign: "center" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 4, color: "rgba(255,215,0,0.6)", textTransform: "uppercase", animation: "pulse 1.5s ease-in-out infinite" }}>{label}</div>
       </div>
-      {count <= 0 && (
-        <div style={{ fontSize: 28, fontWeight: 900, color: "#FFD700", animation: "bounceIn 0.5s ease", letterSpacing: 4 }}>
-          REVEAL!
-        </div>
-      )}
+    );
+  }
+
+  if (stage === "fizzle") {
+    return (
+      <div style={{ position: "relative", padding: 60, textAlign: "center", overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(circle, rgba(255,215,0,0.3) 0%, transparent 70%)",
+          animation: "fireworkBurst 1s ease-out forwards",
+        }} />
+        <div style={{
+          fontSize: 48, fontWeight: 900, letterSpacing: 6,
+          background: "linear-gradient(90deg, #FFD700, #fff, #FFD700)",
+          backgroundSize: "200%", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          animation: "textShine 1s linear infinite",
+          textShadow: "none",
+        }}>REVEAL</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: 50, textAlign: "center", position: "relative" }}>
+      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 4, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", marginBottom: 16 }}>{label}</div>
+      <div key={num} style={{
+        fontSize: 160, fontWeight: 900, lineHeight: 1,
+        color: "transparent",
+        background: `linear-gradient(180deg, #FFD700, ${num === 1 ? "#FF6B6B" : num === 2 ? "#FFE66D" : "#fff"})`,
+        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+        animation: "bounceIn 0.5s ease",
+        filter: `drop-shadow(0 0 ${60 - num * 15}px rgba(255,215,0,${0.4 + (3 - num) * 0.2}))`,
+      }}>{num}</div>
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none",
+        background: `radial-gradient(circle, rgba(255,215,0,${0.05 + (3 - num) * 0.05}) 0%, transparent 60%)`,
+      }} />
     </div>
   );
 }
@@ -1205,6 +1256,19 @@ export default function VibeShowdown() {
       });
       const teamRaw = catMeans.reduce((a, b) => a + b, 0);
 
+      const voterAudit = voterNames.map((vn) => {
+        const scores = {};
+        let total = 0;
+        CATEGORIES.forEach((cat) => {
+          const row = teamVotes.find(
+            (v) => v.voter_name === vn && v.participant_name === p && v.category_id === cat.id
+          );
+          scores[cat.id] = row ? row.score : 0;
+          total += row ? row.score : 0;
+        });
+        return { name: vn, scores, total };
+      });
+
       return {
         name: p,
         ceoTotal: Math.round(ceoTotal * 10) / 10,
@@ -1215,6 +1279,8 @@ export default function VibeShowdown() {
           ceo: ceoForP[cat.id] || 0,
           team: Math.round(catMeans[i] * 10) / 10,
         })),
+        voterAudit,
+        ceoBreakdown: ceoForP,
       };
     });
     scored.sort((a, b) => b.total - a.total);
@@ -1965,7 +2031,7 @@ export default function VibeShowdown() {
                   {prizePhase >= 7 && (
                     <div style={{ animation: "bounceIn 0.8s ease" }}>
                       <div style={iconBox("linear-gradient(135deg, rgba(205,127,50,0.2), rgba(205,127,50,0.05)")}>
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#CD7F32" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#CD7F32" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="2" x2="4" y2="22"/><path d="M4 2c4 0 8 3 8 8"/><circle cx="12" cy="14" r="1"/><path d="M12 15v3c0 1-1 2-2 2"/><path d="M4 6c2 0 3 1 3 2"/></svg>
                       </div>
                       <div style={{ fontSize: 30, fontWeight: 900, color: "#CD7F32", marginBottom: 4 }}>A Real Tenkara</div>
                       <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 15 }}>In the spirit of Tenkara AI</div>
@@ -2600,151 +2666,56 @@ export default function VibeShowdown() {
 
                     {isRev && (
                       <>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 10,
-                            marginBottom: 14,
-                          }}
-                        >
-                          <div
-                            style={{
-                              flex: 1,
-                              background: "rgba(255,230,109,0.1)",
-                              border:
-                                "1px solid rgba(255,230,109,0.25)",
-                              borderRadius: 10,
-                              padding: "8px 14px",
-                              textAlign: "center",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "rgba(255,230,109,0.6)",
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                                letterSpacing: 1,
-                              }}
-                            >
-                              👑 CEO
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 24,
-                                fontWeight: 900,
-                                color: "#FFE66D",
-                              }}
-                            >
-                              {r.ceoTotal}
-                              <span
-                                style={{
-                                  fontSize: 13,
-                                  color: "rgba(255,255,255,0.3)",
-                                }}
-                              >
-                                /25
-                              </span>
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              flex: 1,
-                              background: "rgba(78,205,196,0.1)",
-                              border:
-                                "1px solid rgba(78,205,196,0.25)",
-                              borderRadius: 10,
-                              padding: "8px 14px",
-                              textAlign: "center",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "rgba(78,205,196,0.6)",
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                                letterSpacing: 1,
-                              }}
-                            >
-                              🗳️ TEAM AVG
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 24,
-                                fontWeight: 900,
-                                color: "#4ECDC4",
-                              }}
-                            >
-                              {r.teamTotal}
-                              <span
-                                style={{
-                                  fontSize: 13,
-                                  color: "rgba(255,255,255,0.3)",
-                                }}
-                              >
-                                /25
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(5, 1fr)",
-                            gap: 8,
-                          }}
-                        >
+                        {/* Category breakdown — blended scores */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 14 }}>
                           {r.catBreakdown.map((cb) => (
-                            <div
-                              key={cb.id}
-                              style={{
-                                background: "rgba(255,255,255,0.04)",
-                                borderRadius: 10,
-                                padding: "8px 6px",
-                                textAlign: "center",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: 16,
-                                  marginBottom: 2,
-                                }}
-                              >
-                                {cb.icon}
+                            <div key={cb.id} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "8px 6px", textAlign: "center" }}>
+                              <div style={{ fontSize: 16, marginBottom: 2 }}>{cb.icon}</div>
+                              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4, lineHeight: 1.2 }}>{cb.name}</div>
+                              <div style={{ fontSize: 18, fontWeight: 900, color: "#fff" }}>
+                                {Math.round((cb.ceo + cb.team) * 10) / 10}
                               </div>
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  color: "rgba(255,255,255,0.4)",
-                                  marginBottom: 4,
-                                  lineHeight: 1.2,
-                                }}
-                              >
-                                {cb.name}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 16,
-                                  fontWeight: 900,
-                                  color: "#fff",
-                                }}
-                              >
-                                {Math.round((cb.ceo + cb.team) * 10) /
-                                  10}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  color: "rgba(255,255,255,0.25)",
-                                }}
-                              >
-                                👑{cb.ceo} · 🗳️{cb.team}
-                              </div>
+                              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)" }}>/10</div>
                             </div>
                           ))}
                         </div>
+
+                        {/* Hover audit trail (CEO only) */}
+                        {isCeo && r.voterAudit && (
+                          <details style={{ marginTop: 8, cursor: "pointer" }}>
+                            <summary style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", listStyle: "none", textAlign: "center", padding: "6px 0" }}>
+                              View individual votes ({r.voterAudit.length + 1} voters)
+                            </summary>
+                            <div style={{ marginTop: 8, background: "rgba(0,0,0,0.2)", borderRadius: 12, padding: 12, maxHeight: 200, overflowY: "auto" }}>
+                              {/* CEO row */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                                <div style={{ width: 80, fontSize: 11, fontWeight: 700, color: "#FFE66D" }}>CEO (Ben)</div>
+                                {CATEGORIES.map((cat) => (
+                                  <div key={cat.id} style={{ flex: 1, textAlign: "center", fontSize: 12, color: "#FFE66D", fontWeight: 700 }}>{r.ceoBreakdown?.[cat.id] || "—"}</div>
+                                ))}
+                                <div style={{ width: 50, textAlign: "right", fontSize: 12, fontWeight: 800, color: "#FFE66D" }}>{r.ceoTotal}</div>
+                              </div>
+                              {/* Team rows */}
+                              {r.voterAudit.map((v) => (
+                                <div key={v.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                  <div style={{ width: 80, fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
+                                  {CATEGORIES.map((cat) => (
+                                    <div key={cat.id} style={{ flex: 1, textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{v.scores[cat.id] || "—"}</div>
+                                  ))}
+                                  <div style={{ width: 50, textAlign: "right", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>{v.total}</div>
+                                </div>
+                              ))}
+                              {/* Header row */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0 0", marginTop: 4 }}>
+                                <div style={{ width: 80, fontSize: 9, color: "rgba(255,255,255,0.2)" }}>VOTER</div>
+                                {CATEGORIES.map((cat) => (
+                                  <div key={cat.id} style={{ flex: 1, textAlign: "center", fontSize: 9, color: "rgba(255,255,255,0.2)" }}>{cat.icon}</div>
+                                ))}
+                                <div style={{ width: 50, textAlign: "right", fontSize: 9, color: "rgba(255,255,255,0.2)" }}>TOTAL</div>
+                              </div>
+                            </div>
+                          </details>
+                        )}
 
                         {isLast && (
                           <div
