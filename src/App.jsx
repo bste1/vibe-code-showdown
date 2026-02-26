@@ -1057,13 +1057,18 @@ export default function VibeShowdown() {
     setPhase("login");
   }
 
-  async function lockNamesAndSpin() {
+  async function lockNamesAndRevealPrizes() {
     if (!sessionId) return;
     await supabase
       .from("sessions")
       .update({ locked: true })
       .eq("id", sessionId);
     setSessionLocked(true);
+    setPrizePhase(1);
+    setPhase("prizes");
+  }
+
+  function startSpinFromPrizes() {
     setPhase("spin");
   }
 
@@ -1771,12 +1776,12 @@ export default function VibeShowdown() {
             </div>
           )}
 
-          {/* CEO Lock & Spin button */}
+          {/* CEO Lock & Reveal Prizes button */}
           {canLock && (
             <div style={{ textAlign: "center", marginTop: 20 }}>
-              <button onClick={lockNamesAndSpin}
+              <button onClick={lockNamesAndRevealPrizes}
                 style={{ ...S.btn("linear-gradient(135deg, #FFE66D, #FF6B6B)"), fontSize: 20, padding: "18px 48px", boxShadow: "0 6px 32px rgba(255,107,107,0.4)", animation: "pulse 2s ease-in-out infinite" }}>
-                🎡 Lock Names & Spin the Wheel ({claimedCount} joined)
+                🔒 Lock Names & Reveal Prizes ({claimedCount} joined)
               </button>
             </div>
           )}
@@ -1784,6 +1789,153 @@ export default function VibeShowdown() {
       </div>
     );
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     PHASE: PRIZES — Reveal prizes before spinning (CEO scratches)
+  ═══════════════════════════════════════════════════════════════ */
+  if (phase === "prizes")
+    return (
+      <div style={S.root}>
+        <StarBg />
+        {ceoResetBtn}
+        <Confetti active={confetti} />
+        <UnicornCelebration active={unicorns} />
+        <div style={S.page}>
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <div style={{ fontSize: 56, marginBottom: 8 }}>🎁🏆🎁</div>
+            <h1 style={{ ...S.title, fontSize: 38, margin: 0 }}>
+              {isCeo ? "REVEAL THE PRIZES" : "PRIZES BEING REVEALED..."}
+            </h1>
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 15, margin: "8px 0 0" }}>
+              {isCeo ? "Scratch each card to show the team what they're playing for!" : "Watch as the prizes are revealed..."}
+            </p>
+          </div>
+
+          <div style={{ maxWidth: 700, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+
+            {/* FIRST PLACE PRIZE */}
+            <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(255,215,0,0.5)", background: "linear-gradient(135deg, rgba(255,215,0,0.08), rgba(255,107,107,0.05))", animation: prizePhase >= 3 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
+              <div style={{ padding: "20px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(255,215,0,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥇 First Place Prize</div>
+                {prizePhase < 3 ? (
+                  <div>
+                    {prizePhase === 1 && isCeo && (
+                      <button onClick={() => setPrizePhase(2)} style={{ ...S.btn("linear-gradient(135deg, #FFD700, #FF6B6B)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
+                        🎰 Scratch to Reveal!
+                      </button>
+                    )}
+                    {prizePhase === 2 && (
+                      <ScratchCard width={660} height={180} onComplete={() => { setPrizePhase(3); setConfetti(true); setUnicorns(true); setTimeout(() => { setConfetti(false); setUnicorns(false); }, 8000); }}>
+                        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
+                      </ScratchCard>
+                    )}
+                    {prizePhase < 2 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
+                  </div>
+                ) : (
+                  <div style={{ animation: "bounceIn 0.8s ease" }}>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>🌏✈️🏨</div>
+                    <div style={{
+                      fontSize: 28, fontWeight: 900,
+                      background: "linear-gradient(90deg, #FFD700, #FF6B6B, #FFD700, #4ECDC4, #FFD700)",
+                      backgroundSize: "200%", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                      animation: "textShine 3s linear infinite", lineHeight: 1.3, marginBottom: 12,
+                    }}>ALL-EXPENSE PAID TRIP TO VIETNAM</div>
+                    <div style={{ fontSize: 18, color: "#FFE66D", fontWeight: 700, marginBottom: 6 }}>For you + a guest</div>
+                    <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 12 }}>
+                      <div style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)", borderRadius: 14, padding: "12px 20px", textAlign: "center" }}>
+                        <div style={{ fontSize: 24, marginBottom: 4 }}>🏨</div>
+                        <div style={{ color: "#FFD700", fontWeight: 800, fontSize: 15 }}>Four Seasons</div>
+                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>Ha Noi, Vietnam</div>
+                      </div>
+                      <div style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)", borderRadius: 14, padding: "12px 20px", textAlign: "center" }}>
+                        <div style={{ fontSize: 24, marginBottom: 4 }}>🌙</div>
+                        <div style={{ color: "#FFD700", fontWeight: 800, fontSize: 15 }}>4 Nights / 5 Days</div>
+                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>Full luxury stay</div>
+                      </div>
+                      <div style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)", borderRadius: 14, padding: "12px 20px", textAlign: "center" }}>
+                        <div style={{ fontSize: 24, marginBottom: 4 }}>💰</div>
+                        <div style={{ color: "#FFD700", fontWeight: 800, fontSize: 15 }}>$1,200 Cash</div>
+                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>Pocket money for food</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SECOND PLACE PRIZE */}
+            {prizePhase >= 3 && (
+              <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(192,192,192,0.4)", background: "linear-gradient(135deg, rgba(192,192,192,0.08), rgba(78,205,196,0.05))", animation: prizePhase >= 5 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
+                <div style={{ padding: "20px 24px", textAlign: "center" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(192,192,192,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥈 Second Place Prize</div>
+                  {prizePhase < 5 ? (
+                    <div>
+                      {prizePhase === 3 && isCeo && (
+                        <button onClick={() => setPrizePhase(4)} style={{ ...S.btn("linear-gradient(135deg, #C0C0C0, #45B7D1)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
+                          🎰 Scratch to Reveal!
+                        </button>
+                      )}
+                      {prizePhase === 4 && (
+                        <ScratchCard width={660} height={140} onComplete={() => { setPrizePhase(5); setConfetti(true); setTimeout(() => setConfetti(false), 5000); }}>
+                          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
+                        </ScratchCard>
+                      )}
+                      {prizePhase < 4 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
+                    </div>
+                  ) : (
+                    <div style={{ animation: "bounceIn 0.8s ease" }}>
+                      <div style={{ fontSize: 48, marginBottom: 8 }}>📱</div>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: "#C0C0C0", marginBottom: 4 }}>Brand New iPad</div>
+                      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 15 }}>Fresh out the box</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* THIRD PLACE PRIZE */}
+            {prizePhase >= 5 && (
+              <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(205,127,50,0.4)", background: "linear-gradient(135deg, rgba(205,127,50,0.08), rgba(78,205,196,0.05))", animation: prizePhase >= 7 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
+                <div style={{ padding: "20px 24px", textAlign: "center" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(205,127,50,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥉 Third Place Prize</div>
+                  {prizePhase < 7 ? (
+                    <div>
+                      {prizePhase === 5 && isCeo && (
+                        <button onClick={() => setPrizePhase(6)} style={{ ...S.btn("linear-gradient(135deg, #CD7F32, #96CEB4)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
+                          🎰 Scratch to Reveal!
+                        </button>
+                      )}
+                      {prizePhase === 6 && (
+                        <ScratchCard width={660} height={140} onComplete={() => { setPrizePhase(7); setConfetti(true); setTimeout(() => setConfetti(false), 4000); }}>
+                          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
+                        </ScratchCard>
+                      )}
+                      {prizePhase < 6 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
+                    </div>
+                  ) : (
+                    <div style={{ animation: "bounceIn 0.8s ease" }}>
+                      <div style={{ fontSize: 48, marginBottom: 8 }}>🎣</div>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: "#CD7F32", marginBottom: 4 }}>A Real Tenkara</div>
+                      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 15 }}>In the spirit of Tenkara AI</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Proceed to wheel after all prizes revealed */}
+            {prizePhase >= 7 && isCeo && (
+              <div style={{ textAlign: "center", marginTop: 16 }}>
+                <button onClick={startSpinFromPrizes}
+                  style={{ ...S.btn("linear-gradient(135deg, #FFE66D, #FF6B6B)"), fontSize: 22, padding: "20px 56px", animation: "pulse 2s ease-in-out infinite", boxShadow: "0 8px 40px rgba(255,230,109,0.4)" }}>
+                  🎡 Now Let's Spin the Wheel!
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
 
   /* ═══════════════════════════════════════════════════════════════
      PHASE: SPIN — Wheel determines presentation order (CEO only)
@@ -2622,150 +2774,7 @@ export default function VibeShowdown() {
             })}
           </div>
 
-          {/* ── PRIZE REVEALS ── */}
-          {allRevealed && isCeo && prizePhase === 0 && (
-            <div style={{ textAlign: "center", marginTop: 40 }}>
-              <button
-                onClick={() => setPrizePhase(1)}
-                style={{ ...S.btn("linear-gradient(135deg, #FFD700, #FF6B6B, #FFD700)"), fontSize: 22, padding: "20px 56px", animation: "pulse 2s ease-in-out infinite", boxShadow: "0 8px 40px rgba(255,215,0,0.4)" }}
-              >
-                🎁 REVEAL THE PRIZES
-              </button>
-            </div>
-          )}
-
-          {allRevealed && prizePhase >= 1 && (
-            <div style={{ maxWidth: 700, margin: "40px auto 0", display: "flex", flexDirection: "column", gap: 24 }}>
-
-              {/* FIRST PLACE PRIZE */}
-              {prizePhase >= 1 && (
-                <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(255,215,0,0.5)", background: "linear-gradient(135deg, rgba(255,215,0,0.08), rgba(255,107,107,0.05))", animation: prizePhase >= 3 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
-                  <div style={{ padding: "20px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(255,215,0,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥇 First Place Prize</div>
-                    {prizePhase < 3 ? (
-                      <div>
-                        {prizePhase === 1 && isCeo && (
-                          <button onClick={() => setPrizePhase(2)} style={{ ...S.btn("linear-gradient(135deg, #FFD700, #FF6B6B)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
-                            🎰 Scratch to Reveal!
-                          </button>
-                        )}
-                        {prizePhase === 2 && (
-                          <ScratchCard width={660} height={180} onComplete={() => { setPrizePhase(3); setConfetti(true); setUnicorns(true); setTimeout(() => { setConfetti(false); setUnicorns(false); }, 8000); }}>
-                            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
-                          </ScratchCard>
-                        )}
-                        {prizePhase < 2 && !isCeo && (
-                          <div style={{ fontSize: 48, padding: 20 }}>🎁</div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ animation: "bounceIn 0.8s ease" }}>
-                        <div style={{ fontSize: 48, marginBottom: 12 }}>🌏✈️🏨</div>
-                        <div style={{
-                          fontSize: 28, fontWeight: 900,
-                          background: "linear-gradient(90deg, #FFD700, #FF6B6B, #FFD700, #4ECDC4, #FFD700)",
-                          backgroundSize: "200%", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                          animation: "textShine 3s linear infinite", lineHeight: 1.3, marginBottom: 12,
-                        }}>
-                          ALL-EXPENSE PAID TRIP TO VIETNAM
-                        </div>
-                        <div style={{ fontSize: 18, color: "#FFE66D", fontWeight: 700, marginBottom: 6 }}>
-                          For you + a guest
-                        </div>
-                        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 12 }}>
-                          <div style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)", borderRadius: 14, padding: "12px 20px", textAlign: "center" }}>
-                            <div style={{ fontSize: 24, marginBottom: 4 }}>🏨</div>
-                            <div style={{ color: "#FFD700", fontWeight: 800, fontSize: 15 }}>Four Seasons</div>
-                            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>Ha Noi, Vietnam</div>
-                          </div>
-                          <div style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)", borderRadius: 14, padding: "12px 20px", textAlign: "center" }}>
-                            <div style={{ fontSize: 24, marginBottom: 4 }}>🌙</div>
-                            <div style={{ color: "#FFD700", fontWeight: 800, fontSize: 15 }}>4 Nights / 5 Days</div>
-                            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>Full luxury stay</div>
-                          </div>
-                          <div style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)", borderRadius: 14, padding: "12px 20px", textAlign: "center" }}>
-                            <div style={{ fontSize: 24, marginBottom: 4 }}>💰</div>
-                            <div style={{ color: "#FFD700", fontWeight: 800, fontSize: 15 }}>$1,200 Cash</div>
-                            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>Pocket money for food</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* SECOND PLACE PRIZE */}
-              {prizePhase >= 3 && (
-                <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(192,192,192,0.4)", background: "linear-gradient(135deg, rgba(192,192,192,0.08), rgba(78,205,196,0.05))", animation: prizePhase >= 5 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
-                  <div style={{ padding: "20px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(192,192,192,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥈 Second Place Prize</div>
-                    {prizePhase < 5 ? (
-                      <div>
-                        {prizePhase === 3 && isCeo && (
-                          <button onClick={() => setPrizePhase(4)} style={{ ...S.btn("linear-gradient(135deg, #C0C0C0, #45B7D1)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
-                            🎰 Scratch to Reveal!
-                          </button>
-                        )}
-                        {prizePhase === 4 && (
-                          <ScratchCard width={660} height={140} onComplete={() => { setPrizePhase(5); setConfetti(true); setTimeout(() => setConfetti(false), 5000); }}>
-                            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
-                          </ScratchCard>
-                        )}
-                        {prizePhase < 4 && !isCeo && (
-                          <div style={{ fontSize: 48, padding: 20 }}>🎁</div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ animation: "bounceIn 0.8s ease" }}>
-                        <div style={{ fontSize: 48, marginBottom: 8 }}>📱</div>
-                        <div style={{ fontSize: 26, fontWeight: 900, color: "#C0C0C0", marginBottom: 4 }}>
-                          Brand New iPad
-                        </div>
-                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 15 }}>Fresh out the box</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* THIRD PLACE PRIZE */}
-              {prizePhase >= 5 && (
-                <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(205,127,50,0.4)", background: "linear-gradient(135deg, rgba(205,127,50,0.08), rgba(78,205,196,0.05))", animation: prizePhase >= 7 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
-                  <div style={{ padding: "20px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(205,127,50,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥉 Third Place Prize</div>
-                    {prizePhase < 7 ? (
-                      <div>
-                        {prizePhase === 5 && isCeo && (
-                          <button onClick={() => setPrizePhase(6)} style={{ ...S.btn("linear-gradient(135deg, #CD7F32, #96CEB4)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
-                            🎰 Scratch to Reveal!
-                          </button>
-                        )}
-                        {prizePhase === 6 && (
-                          <ScratchCard width={660} height={140} onComplete={() => { setPrizePhase(7); setConfetti(true); setTimeout(() => setConfetti(false), 4000); }}>
-                            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
-                          </ScratchCard>
-                        )}
-                        {prizePhase < 6 && !isCeo && (
-                          <div style={{ fontSize: 48, padding: 20 }}>🎁</div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ animation: "bounceIn 0.8s ease" }}>
-                        <div style={{ fontSize: 48, marginBottom: 8 }}>🎣</div>
-                        <div style={{ fontSize: 26, fontWeight: 900, color: "#CD7F32", marginBottom: 4 }}>
-                          A Real Tenkara
-                        </div>
-                        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 15 }}>In the spirit of Tenkara AI</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {allRevealed && isCeo && prizePhase >= 7 && (
+          {allRevealed && isCeo && (
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <button
                 onClick={resetShow}
