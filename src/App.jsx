@@ -453,11 +453,17 @@ function LockScreen({ voterName, onUnlock }) {
 }
 
 /* ─── SCRATCH CARD CANVAS ────────────────────────────────────── */
-function ScratchCard({ width, height, onComplete, children }) {
+function ScratchCard({ width, height, onComplete, children, color = "gold" }) {
   const canvasRef = useRef(null);
   const isDrawing = useRef(false);
-  const percentRef = useRef(0);
   const doneRef = useRef(false);
+
+  const palette = {
+    gold: { c1: "#b8860b", c2: "#ffd700", c3: "#daa520", sparkle: "#fff8dc" },
+    silver: { c1: "#708090", c2: "#c0c0c0", c3: "#a9a9a9", sparkle: "#f0f0f0" },
+    bronze: { c1: "#8b4513", c2: "#cd7f32", c3: "#a0522d", sparkle: "#ffe4c4" },
+  };
+  const pal = palette[color] || palette.gold;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -466,28 +472,43 @@ function ScratchCard({ width, height, onComplete, children }) {
     canvas.width = width;
     canvas.height = height;
 
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, "#2a1052");
-    gradient.addColorStop(0.5, "#0d2b5e");
-    gradient.addColorStop(1, "#0f4a3a");
-    ctx.fillStyle = gradient;
+    const grad = ctx.createLinearGradient(0, 0, width, height);
+    grad.addColorStop(0, pal.c1);
+    grad.addColorStop(0.3, pal.c2);
+    grad.addColorStop(0.5, pal.c3);
+    grad.addColorStop(0.7, pal.c2);
+    grad.addColorStop(1, pal.c1);
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = "rgba(255,255,255,0.15)";
-    ctx.font = "bold 14px Trebuchet MS";
-    ctx.textAlign = "center";
-    ctx.fillText("✨ SCRATCH HERE ✨", width / 2, height / 2 + 5);
+    for (let i = 0; i < 80; i++) {
+      const x = Math.random() * width;
+      const y = Math.random() * height;
+      const r = Math.random() * 3 + 1;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.4 + 0.1})`;
+      ctx.fill();
+    }
 
-    const emojis = ["🎰", "🦄", "🌈", "⭐", "💎"];
-    emojis.forEach((e, i) => {
-      ctx.font = "20px serif";
-      ctx.fillText(
-        e,
-        30 + (i * (width - 60)) / (emojis.length - 1),
-        height / 2 - 18
-      );
-    });
-  }, [width, height]);
+    for (let i = 0; i < 12; i++) {
+      const x = Math.random() * width;
+      const y = Math.random() * height;
+      ctx.font = `${Math.random() * 14 + 16}px serif`;
+      ctx.fillText(["✨", "⭐", "💫", "🌟", "🎰", "🎁", "🎊"][Math.floor(Math.random() * 7)], x, y);
+    }
+
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.font = `bold ${Math.min(22, width / 20)}px Trebuchet MS`;
+    ctx.textAlign = "center";
+    ctx.fillText("✨ SCRATCH TO REVEAL ✨", width / 2, height / 2 + 8);
+
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([8, 8]);
+    ctx.strokeRect(12, 12, width - 24, height - 24);
+    ctx.setLineDash([]);
+  }, [width, height, pal]);
 
   const scratch = useCallback(
     (x, y) => {
@@ -495,8 +516,13 @@ function ScratchCard({ width, height, onComplete, children }) {
       if (!canvas || doneRef.current) return;
       const ctx = canvas.getContext("2d");
       ctx.globalCompositeOperation = "destination-out";
+      const r = 32;
+      const radGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
+      radGrad.addColorStop(0, "rgba(0,0,0,1)");
+      radGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = radGrad;
       ctx.beginPath();
-      ctx.arc(x, y, 28, 0, Math.PI * 2);
+      ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalCompositeOperation = "source-over";
 
@@ -506,8 +532,7 @@ function ScratchCard({ width, height, onComplete, children }) {
         if (imageData.data[i] === 0) cleared++;
       }
       const pct = cleared / (imageData.data.length / 4);
-      percentRef.current = pct;
-      if (pct > 0.4 && !doneRef.current) {
+      if (pct > 0.35 && !doneRef.current) {
         doneRef.current = true;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         onComplete();
@@ -527,53 +552,19 @@ function ScratchCard({ width, height, onComplete, children }) {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", height }}>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+    <div style={{ position: "relative", width: "100%", height, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
         {children}
       </div>
       <canvas
         ref={canvasRef}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          cursor: "crosshair",
-          borderRadius: 16,
-          touchAction: "none",
-        }}
-        onMouseDown={(e) => {
-          isDrawing.current = true;
-          const p = getPos(e);
-          scratch(p.x, p.y);
-        }}
-        onMouseMove={(e) => {
-          if (!isDrawing.current) return;
-          const p = getPos(e);
-          scratch(p.x, p.y);
-        }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", cursor: "crosshair", borderRadius: 16, touchAction: "none" }}
+        onMouseDown={(e) => { isDrawing.current = true; scratch(getPos(e).x, getPos(e).y); }}
+        onMouseMove={(e) => { if (isDrawing.current) scratch(getPos(e).x, getPos(e).y); }}
         onMouseUp={() => (isDrawing.current = false)}
         onMouseLeave={() => (isDrawing.current = false)}
-        onTouchStart={(e) => {
-          e.preventDefault();
-          isDrawing.current = true;
-          const p = getPos(e);
-          scratch(p.x, p.y);
-        }}
-        onTouchMove={(e) => {
-          e.preventDefault();
-          if (!isDrawing.current) return;
-          const p = getPos(e);
-          scratch(p.x, p.y);
-        }}
+        onTouchStart={(e) => { e.preventDefault(); isDrawing.current = true; scratch(getPos(e).x, getPos(e).y); }}
+        onTouchMove={(e) => { e.preventDefault(); if (isDrawing.current) scratch(getPos(e).x, getPos(e).y); }}
         onTouchEnd={() => (isDrawing.current = false)}
       />
     </div>
@@ -1814,24 +1805,25 @@ export default function VibeShowdown() {
           <div style={{ maxWidth: 700, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
 
             {/* FIRST PLACE PRIZE */}
-            <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(255,215,0,0.5)", background: "linear-gradient(135deg, rgba(255,215,0,0.08), rgba(255,107,107,0.05))", animation: prizePhase >= 3 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
+            <div style={{ borderRadius: 24, overflow: "hidden", border: `2px solid ${prizePhase >= 3 ? "rgba(255,215,0,0.6)" : "rgba(255,215,0,0.3)"}`, background: "rgba(255,215,0,0.04)", animation: prizePhase >= 3 ? "prizeGlow 3s ease-in-out infinite" : "none" }}>
               <div style={{ padding: "20px 24px", textAlign: "center" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(255,215,0,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥇 First Place Prize</div>
-                {prizePhase < 3 ? (
-                  <div>
-                    {prizePhase === 1 && isCeo && (
-                      <button onClick={() => setPrizePhase(2)} style={{ ...S.btn("linear-gradient(135deg, #FFD700, #FF6B6B)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
-                        🎰 Scratch to Reveal!
-                      </button>
-                    )}
-                    {prizePhase === 2 && (
-                      <ScratchCard width={660} height={180} onComplete={() => { setPrizePhase(3); setConfetti(true); setUnicorns(true); setTimeout(() => { setConfetti(false); setUnicorns(false); }, 8000); }}>
-                        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
-                      </ScratchCard>
-                    )}
-                    {prizePhase < 2 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
-                  </div>
-                ) : (
+                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(255,215,0,0.6)", textTransform: "uppercase", marginBottom: 12 }}>🥇 First Place Prize</div>
+                {prizePhase === 1 && isCeo && (
+                  <button onClick={() => setPrizePhase(2)} style={{ ...S.btn("linear-gradient(135deg, #FFD700, #FF6B6B)"), fontSize: 18, padding: "14px 40px", marginBottom: 8 }}>
+                    🎰 Scratch to Reveal!
+                  </button>
+                )}
+                {prizePhase === 2 && (
+                  <ScratchCard width={660} height={220} color="gold" onComplete={() => { setPrizePhase(3); setConfetti(true); setUnicorns(true); setTimeout(() => { setConfetti(false); setUnicorns(false); }, 8000); }}>
+                    <div style={{ textAlign: "center", width: "100%" }}>
+                      <div style={{ fontSize: 36, marginBottom: 8 }}>🌏✈️🏨</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: "#FFD700", lineHeight: 1.3 }}>ALL-EXPENSE PAID TRIP TO VIETNAM</div>
+                      <div style={{ fontSize: 14, color: "#FFE66D", fontWeight: 700, marginTop: 4 }}>You + a guest | Four Seasons Ha Noi | 4N/5D | $1,200 cash</div>
+                    </div>
+                  </ScratchCard>
+                )}
+                {prizePhase < 2 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
+                {prizePhase >= 3 && (
                   <div style={{ animation: "bounceIn 0.8s ease" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>🌏✈️🏨</div>
                     <div style={{
@@ -1865,24 +1857,25 @@ export default function VibeShowdown() {
 
             {/* SECOND PLACE PRIZE */}
             {prizePhase >= 3 && (
-              <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(192,192,192,0.4)", background: "linear-gradient(135deg, rgba(192,192,192,0.08), rgba(78,205,196,0.05))", animation: prizePhase >= 5 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
+              <div style={{ borderRadius: 24, overflow: "hidden", border: `2px solid ${prizePhase >= 5 ? "rgba(192,192,192,0.6)" : "rgba(192,192,192,0.3)"}`, background: "rgba(192,192,192,0.04)", animation: prizePhase >= 5 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
                 <div style={{ padding: "20px 24px", textAlign: "center" }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(192,192,192,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥈 Second Place Prize</div>
-                  {prizePhase < 5 ? (
-                    <div>
-                      {prizePhase === 3 && isCeo && (
-                        <button onClick={() => setPrizePhase(4)} style={{ ...S.btn("linear-gradient(135deg, #C0C0C0, #45B7D1)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
-                          🎰 Scratch to Reveal!
-                        </button>
-                      )}
-                      {prizePhase === 4 && (
-                        <ScratchCard width={660} height={140} onComplete={() => { setPrizePhase(5); setConfetti(true); setTimeout(() => setConfetti(false), 5000); }}>
-                          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
-                        </ScratchCard>
-                      )}
-                      {prizePhase < 4 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
-                    </div>
-                  ) : (
+                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(192,192,192,0.6)", textTransform: "uppercase", marginBottom: 12 }}>🥈 Second Place Prize</div>
+                  {prizePhase === 3 && isCeo && (
+                    <button onClick={() => setPrizePhase(4)} style={{ ...S.btn("linear-gradient(135deg, #C0C0C0, #45B7D1)"), fontSize: 18, padding: "14px 40px", marginBottom: 8 }}>
+                      🎰 Scratch to Reveal!
+                    </button>
+                  )}
+                  {prizePhase === 4 && (
+                    <ScratchCard width={660} height={160} color="silver" onComplete={() => { setPrizePhase(5); setConfetti(true); setTimeout(() => setConfetti(false), 5000); }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 36, marginBottom: 6 }}>📱</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: "#C0C0C0" }}>Brand New iPad</div>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Fresh out the box</div>
+                      </div>
+                    </ScratchCard>
+                  )}
+                  {prizePhase < 4 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
+                  {prizePhase >= 5 && (
                     <div style={{ animation: "bounceIn 0.8s ease" }}>
                       <div style={{ fontSize: 48, marginBottom: 8 }}>📱</div>
                       <div style={{ fontSize: 26, fontWeight: 900, color: "#C0C0C0", marginBottom: 4 }}>Brand New iPad</div>
@@ -1895,24 +1888,25 @@ export default function VibeShowdown() {
 
             {/* THIRD PLACE PRIZE */}
             {prizePhase >= 5 && (
-              <div style={{ borderRadius: 24, overflow: "hidden", border: "2px solid rgba(205,127,50,0.4)", background: "linear-gradient(135deg, rgba(205,127,50,0.08), rgba(78,205,196,0.05))", animation: prizePhase >= 7 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
+              <div style={{ borderRadius: 24, overflow: "hidden", border: `2px solid ${prizePhase >= 7 ? "rgba(205,127,50,0.6)" : "rgba(205,127,50,0.3)"}`, background: "rgba(205,127,50,0.04)", animation: prizePhase >= 7 ? "prizeGlow 3s ease-in-out infinite" : "bounceIn 0.6s ease" }}>
                 <div style={{ padding: "20px 24px", textAlign: "center" }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(205,127,50,0.6)", textTransform: "uppercase", marginBottom: 8 }}>🥉 Third Place Prize</div>
-                  {prizePhase < 7 ? (
-                    <div>
-                      {prizePhase === 5 && isCeo && (
-                        <button onClick={() => setPrizePhase(6)} style={{ ...S.btn("linear-gradient(135deg, #CD7F32, #96CEB4)"), fontSize: 18, padding: "14px 40px", marginBottom: 16 }}>
-                          🎰 Scratch to Reveal!
-                        </button>
-                      )}
-                      {prizePhase === 6 && (
-                        <ScratchCard width={660} height={140} onComplete={() => { setPrizePhase(7); setConfetti(true); setTimeout(() => setConfetti(false), 4000); }}>
-                          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.2)" }}>Scratching...</div>
-                        </ScratchCard>
-                      )}
-                      {prizePhase < 6 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
-                    </div>
-                  ) : (
+                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 2, color: "rgba(205,127,50,0.6)", textTransform: "uppercase", marginBottom: 12 }}>🥉 Third Place Prize</div>
+                  {prizePhase === 5 && isCeo && (
+                    <button onClick={() => setPrizePhase(6)} style={{ ...S.btn("linear-gradient(135deg, #CD7F32, #96CEB4)"), fontSize: 18, padding: "14px 40px", marginBottom: 8 }}>
+                      🎰 Scratch to Reveal!
+                    </button>
+                  )}
+                  {prizePhase === 6 && (
+                    <ScratchCard width={660} height={160} color="bronze" onComplete={() => { setPrizePhase(7); setConfetti(true); setTimeout(() => setConfetti(false), 4000); }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 36, marginBottom: 6 }}>🎣</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: "#CD7F32" }}>A Real Tenkara</div>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>In the spirit of Tenkara AI</div>
+                      </div>
+                    </ScratchCard>
+                  )}
+                  {prizePhase < 6 && !isCeo && <div style={{ fontSize: 48, padding: 20 }}>🎁</div>}
+                  {prizePhase >= 7 && (
                     <div style={{ animation: "bounceIn 0.8s ease" }}>
                       <div style={{ fontSize: 48, marginBottom: 8 }}>🎣</div>
                       <div style={{ fontSize: 26, fontWeight: 900, color: "#CD7F32", marginBottom: 4 }}>A Real Tenkara</div>
