@@ -781,6 +781,7 @@ export default function VibeShowdown() {
   const [roundScores, setRoundScores] = useState({});
   const [myVoteSubmitted, setMyVoteSubmitted] = useState(false);
   const [roundVoteCount, setRoundVoteCount] = useState(0);
+  const [roundVotedNames, setRoundVotedNames] = useState(new Set());
   const [totalVoters, setTotalVoters] = useState(0);
 
   const [results, setResults] = useState([]);
@@ -976,6 +977,7 @@ export default function VibeShowdown() {
     if (!data) return;
     const uniqueVoters = new Set(data.map((v) => v.voter_name));
     setRoundVoteCount(uniqueVoters.size);
+    setRoundVotedNames(uniqueVoters);
   }
 
   useEffect(() => {
@@ -1069,6 +1071,7 @@ export default function VibeShowdown() {
     setMyVoteSubmitted(false);
     setRoundScores({});
     setRoundVoteCount(0);
+    setRoundVotedNames(new Set());
     await supabase
       .from("sessions")
       .update({ presentation_order: orderedNames, current_round: 0, phase: "voting" })
@@ -1151,6 +1154,7 @@ export default function VibeShowdown() {
     setMyVoteSubmitted(false);
     setRoundScores({});
     setRoundVoteCount(0);
+    setRoundVotedNames(new Set());
   }
 
   async function calculateAndReveal() {
@@ -1295,6 +1299,7 @@ export default function VibeShowdown() {
     setRoundScores({});
     setMyVoteSubmitted(false);
     setRoundVoteCount(0);
+    setRoundVotedNames(new Set());
     setResults([]);
     setRevealed([]);
     setAllRevealed(false);
@@ -1809,47 +1814,114 @@ export default function VibeShowdown() {
     const isSelf = activeVoter === currentCandidate && activeVoter !== CEO_NAME;
 
     if (isSelf || myVoteSubmitted) {
+      const expectedVoters = voterOrder.filter((p) => p !== currentCandidate);
+      const votedList = expectedVoters.filter((p) => roundVotedNames.has(p));
+      const pendingList = expectedVoters.filter((p) => !roundVotedNames.has(p));
+      const ceoHasVoted = myVoteSubmitted || isSelf;
+
       return (
         <div style={S.root}>
           <StarBg />
         {ceoResetBtn}
-          <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "80vh", flexDirection: "column", gap: 20, textAlign: "center" }}>
-            <div style={{ fontSize: 64, animation: "crownBounce 2s ease-in-out infinite", display: "inline-block" }}>
-              {isSelf ? "🙈" : "✅"}
+          <div style={{ ...S.page, maxWidth: 600, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 56, animation: "crownBounce 2s ease-in-out infinite", display: "inline-block" }}>
+                {isSelf ? "🙈" : "✅"}
+              </div>
+              <h2 style={{ ...S.title, fontSize: 26, margin: "12px 0 0" }}>
+                {isSelf ? `It's your turn, ${activeVoter}!` : "Vote Submitted!"}
+              </h2>
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, margin: "6px 0 0" }}>
+                {isSelf
+                  ? "Sit back while everyone else rates you!"
+                  : "Waiting for everyone else..."}
+              </p>
+              <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 13, marginTop: 8 }}>
+                Round {currentRound + 1} of {presentationOrder.length} · Voting on: {currentCandidate}
+              </div>
             </div>
-            <h2 style={{ ...S.title, fontSize: 28, margin: 0 }}>
-              {isSelf ? `It's your turn, ${activeVoter}!` : "Vote Submitted!"}
-            </h2>
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 16, maxWidth: 400, lineHeight: 1.5, margin: 0 }}>
-              {isSelf
-                ? "You can't vote on your own app. Sit back and enjoy while everyone else rates you!"
-                : "Your scores are locked in. Waiting for everyone else..."}
-            </p>
 
             {/* Progress bar */}
-            <div style={{ width: 300, background: "rgba(255,255,255,0.1)", borderRadius: 12, height: 8, marginTop: 8, overflow: "hidden" }}>
-              <div style={{ width: `${totalVoters > 0 ? (roundVoteCount / totalVoters) * 100 : 0}%`, height: "100%", background: "linear-gradient(90deg, #4ECDC4, #45B7D1)", borderRadius: 12, transition: "width 0.5s ease" }} />
+            <div style={{ width: "100%", background: "rgba(255,255,255,0.1)", borderRadius: 12, height: 10, overflow: "hidden", marginBottom: 8 }}>
+              <div style={{ width: `${totalVoters > 0 ? (roundVoteCount / totalVoters) * 100 : 0}%`, height: "100%", background: allRoundVotesIn ? "linear-gradient(90deg, #4ECDC4, #45B7D1)" : "linear-gradient(90deg, #FFE66D, #FF6B6B)", borderRadius: 12, transition: "width 0.5s ease" }} />
             </div>
-            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>
+            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 14, marginBottom: 20 }}>
               {roundVoteCount} of {totalVoters} voted
-            </span>
+            </div>
 
-            {/* CEO controls */}
-            {isCeo && allRoundVotesIn && (
-              <div style={{ marginTop: 16, ...S.card("rgba(255,230,109,0.1)"), border: "1px solid rgba(255,230,109,0.3)", textAlign: "center", maxWidth: 420 }}>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#FFE66D", marginBottom: 8 }}>All votes are in!</div>
-                <button
-                  onClick={isLastRound ? calculateAndReveal : advanceRound}
-                  style={{ ...S.btn(), fontSize: 18, padding: "14px 40px", animation: "pulse 2s ease-in-out infinite" }}
-                >
-                  {isLastRound ? "🎪 See Results!" : `➡️ Next: ${presentationOrder[currentRound + 1]}`}
-                </button>
+            {/* CEO: Voter status panel */}
+            {isCeo && (
+              <div style={{ ...S.card("rgba(255,255,255,0.04)"), marginBottom: 20 }}>
+                <span style={S.label}>Voter Status</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 240, overflowY: "auto" }}>
+                  {expectedVoters.map((name) => {
+                    const voted = roundVotedNames.has(name);
+                    const isCeoVoter = name === CEO_NAME;
+                    return (
+                      <div key={name} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "6px 12px", borderRadius: 10,
+                        background: voted ? "rgba(78,205,196,0.08)" : "rgba(255,107,107,0.06)",
+                        border: `1px solid ${voted ? "rgba(78,205,196,0.2)" : "rgba(255,107,107,0.15)"}`,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%",
+                            background: isCeoVoter ? "linear-gradient(135deg, #FFE66D, #FF6B6B)" : AVATAR_COLORS[people.indexOf(name) % AVATAR_COLORS.length],
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 9, fontWeight: 900, color: "#000",
+                          }}>{isCeoVoter ? "👑" : initials(name)}</div>
+                          <span style={{ color: voted ? "#4ECDC4" : "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: 13 }}>
+                            {name}{isCeoVoter ? " (CEO)" : ""}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: voted ? "#4ECDC4" : "#FF6B6B" }}>
+                          {voted ? "✅ Voted" : "⏳ Waiting"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {pendingList.length > 0 && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
+                    Still waiting on: {pendingList.join(", ")}
+                  </div>
+                )}
               </div>
             )}
 
-            <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 13, marginTop: 8 }}>
-              Round {currentRound + 1} of {presentationOrder.length} · Now voting on: {currentCandidate}
-            </div>
+            {/* CEO controls */}
+            {isCeo && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {allRoundVotesIn ? (
+                  <div style={{ ...S.card("rgba(255,230,109,0.1)"), border: "1px solid rgba(255,230,109,0.3)", textAlign: "center" }}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: "#FFE66D", marginBottom: 8 }}>All votes are in!</div>
+                    <button
+                      onClick={isLastRound ? calculateAndReveal : advanceRound}
+                      style={{ ...S.btn(), fontSize: 18, padding: "14px 40px", animation: "pulse 2s ease-in-out infinite" }}
+                    >
+                      {isLastRound ? "🎪 See Results!" : `➡️ Next: ${presentationOrder[currentRound + 1]}`}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ ...S.card("rgba(255,107,107,0.06)"), border: "1px solid rgba(255,107,107,0.15)", textAlign: "center" }}>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
+                      Tired of waiting? Move on with {roundVoteCount} of {totalVoters} votes.
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!window.confirm(`Only ${roundVoteCount} of ${totalVoters} have voted. Move on anyway? Missing votes won't count for this candidate.`)) return;
+                        if (isLastRound) calculateAndReveal();
+                        else advanceRound();
+                      }}
+                      style={{ ...S.btn("rgba(255,107,107,0.2)", "#FF6B6B"), fontSize: 14, padding: "10px 28px" }}
+                    >
+                      ⚡ Force {isLastRound ? "Results" : "Next"} ({pendingList.length} missing)
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
