@@ -5,7 +5,7 @@ import { supabase, fetchAllRows, withRetry } from "./supabase";
 const CATEGORIES = [
   {
     id: "c1",
-    icon: "⚡",
+    icon: "01",
     name: "Work Eliminator",
     desc: "Reduces time spent on any routine task",
     guide:
@@ -20,7 +20,7 @@ const CATEGORIES = [
   },
   {
     id: "c2",
-    icon: "🎯",
+    icon: "02",
     name: "Ease of Use",
     desc: "Intuitive, simple, frictionless",
     guide:
@@ -35,7 +35,7 @@ const CATEGORIES = [
   },
   {
     id: "c3",
-    icon: "🚀",
+    icon: "03",
     name: "Readiness",
     desc: "Can be used right now, delivers value immediately",
     guide:
@@ -50,7 +50,7 @@ const CATEGORIES = [
   },
   {
     id: "c4",
-    icon: "🧩",
+    icon: "04",
     name: "Completeness",
     desc: "Covers edge cases & good surface area",
     guide:
@@ -65,7 +65,7 @@ const CATEGORIES = [
   },
   {
     id: "c5",
-    icon: "💎",
+    icon: "05",
     name: "Importance",
     desc: "Quality of the problem being solved",
     guide:
@@ -120,40 +120,40 @@ const DEFAULT_PENALTIES = {
   "Mildred": "1 Frog (boiled, unflavored, no sauce, not skinned)",
 };
 
-// Tenkara palette — electric blue forward, cream, with signal accents
+// Tenkara palette — restrained blueprint system: blue tints + clay, black text
 const AVATAR_COLORS = [
-  "#0011FF",
-  "#FFFAD0",
-  "#2D4BFF",
-  "#FF4800",
-  "#02FF06",
-  "#FF0202",
-  "#5B73FF",
-  "#FFD000",
-  "#1A2BCC",
   "#8FA0FF",
-  "#FF7A3D",
-  "#3DFF8A",
-  "#0011FF",
-  "#FFE066",
-  "#4C63FF",
   "#FFFAD0",
-  "#FF5252",
+  "#6E84FF",
+  "#C7CEFF",
+  "#5B73FF",
+  "#E6E2C0",
+  "#A8B4FF",
   "#7C8FFF",
-  "#22D4FF",
-  "#2D4BFF",
+  "#9AA8FF",
+  "#B9C2FF",
+  "#6478F5",
+  "#D6DBFF",
+  "#8294FF",
+  "#EFEAC4",
+  "#7184FF",
+  "#AEB9FF",
+  "#5F77F5",
+  "#CDD4FF",
+  "#9DABFF",
+  "#7E91FF",
 ];
 
 const SAD_QUOTES = [
-  '"Every legend has a humble beginning… or something." 😢',
-  '"It\'s not losing, it\'s \'aggressive learning.\'" 😭',
-  '"On the bright side, someone had to go last." 💀',
-  '"First is just last backwards... wait, no." 😅',
-  '"The real treasure was the bugs we shipped along the way." 🐛',
+  '"Every legend has a humble beginning… or something."',
+  '"It\'s not losing, it\'s \'aggressive learning.\'"',
+  '"On the bright side, someone had to go last."',
+  '"First is just last backwards... wait, no."',
+  '"The real treasure was the bugs we shipped along the way."',
 ];
 
 const WINNER_TITLES = [
-  "🏆 THE TENKARA VIP WINNER 🏆",
+  "THE TENKARA VIP WINNER",
 ];
 
 function initials(name) {
@@ -185,7 +185,7 @@ function Confetti({ active }) {
     const ctx = canvas.getContext("2d");
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const colors = ["#FF6B6B","#4ECDC4","#FFE66D","#FF9FF3","#54A0FF","#5F27CD","#00D2D3","#FFD700","#FF6348","#A8EDEA","#f368e0","#ff9f43","#ee5a24","#7bed9f"];
+    const colors = ["#0011FF","#FFFAD0","#2D4BFF","#8FA0FF","#FFFFFF","#5B73FF","#C7CEFF","#0011FF","#E6E2C0","#6E84FF"];
     const makePiece = () => ({
       x: Math.random() * canvas.width,
       y: -20 - Math.random() * canvas.height,
@@ -287,12 +287,13 @@ function CountdownReveal({ onComplete, label }) {
       <div style={{ position: "relative", padding: 60, textAlign: "center", overflow: "hidden" }}>
         <div style={{
           position: "absolute", inset: 0,
-          background: "radial-gradient(circle, rgba(255,215,0,0.3) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(0,17,255,0.35) 0%, transparent 70%)",
           animation: "fireworkBurst 1s ease-out forwards",
         }} />
         <div style={{
-          fontSize: 48, fontWeight: 900, letterSpacing: 6,
-          background: "linear-gradient(90deg, #FFD700, #fff, #FFD700)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 48, fontWeight: 700, letterSpacing: 10,
+          background: "linear-gradient(90deg, #0011FF, #FFFAD0, #0011FF)",
           backgroundSize: "200%", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           animation: "textShine 1s linear infinite",
           textShadow: "none",
@@ -303,32 +304,35 @@ function CountdownReveal({ onComplete, label }) {
 
   return (
     <div style={{ padding: 50, textAlign: "center", position: "relative" }}>
-      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 4, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", marginBottom: 16 }}>{label}</div>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, letterSpacing: 4, color: "rgba(255,250,208,0.3)", textTransform: "uppercase", marginBottom: 16 }}>{label}</div>
       <div key={num} style={{
-        fontSize: 160, fontWeight: 900, lineHeight: 1,
+        fontFamily: "var(--font-mono)",
+        fontSize: 160, fontWeight: 700, lineHeight: 1,
         color: "transparent",
-        background: `linear-gradient(180deg, #FFD700, ${num === 1 ? "#FF6B6B" : num === 2 ? "#FFE66D" : "#fff"})`,
+        background: `linear-gradient(180deg, #FFFAD0, ${num === 1 ? "#0011FF" : num === 2 ? "#8FA0FF" : "#FFFAD0"})`,
         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         animation: "bounceIn 0.5s ease",
-        filter: `drop-shadow(0 0 ${60 - num * 15}px rgba(255,215,0,${0.4 + (3 - num) * 0.2}))`,
+        filter: `drop-shadow(0 0 ${60 - num * 15}px rgba(0,17,255,${0.4 + (3 - num) * 0.2}))`,
       }}>{num}</div>
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: `radial-gradient(circle, rgba(255,215,0,${0.05 + (3 - num) * 0.05}) 0%, transparent 60%)`,
+        background: `radial-gradient(circle, rgba(0,17,255,${0.05 + (3 - num) * 0.05}) 0%, transparent 60%)`,
       }} />
     </div>
   );
 }
 
-/* ─── UNICORN + RAINBOW CELEBRATION ──────────────────────────── */
+/* ─── SYSTEM CELEBRATION (rising brand marks) ────────────────── */
 function UnicornCelebration({ active }) {
   if (!active) return null;
-  const unicorns = Array.from({ length: 12 }, (_, i) => ({
-    emoji: ["🦄", "🌈", "✨", "⭐", "🎉", "🎊", "💫", "🔮", "🏆", "👑", "💎", "🎪"][i],
+  const palette = ["#0011FF", "#FFFAD0", "#2D4BFF", "#8FA0FF"];
+  const marks = Array.from({ length: 22 }, (_, i) => ({
+    kind: i % 3, // 0 square, 1 chevron, 2 ring
+    color: palette[i % palette.length],
     left: Math.random() * 100,
     delay: Math.random() * 3,
-    dur: 2 + Math.random() * 3,
-    size: 20 + Math.random() * 30,
+    dur: 2.5 + Math.random() * 3,
+    size: 10 + Math.random() * 16,
   }));
   return (
     <div
@@ -340,18 +344,38 @@ function UnicornCelebration({ active }) {
         overflow: "hidden",
       }}
     >
-      {unicorns.map((u, i) => (
+      {marks.map((m, i) => (
         <div
           key={i}
           style={{
             position: "absolute",
-            left: `${u.left}%`,
+            left: `${m.left}%`,
             bottom: -60,
-            fontSize: u.size,
-            animation: `floatUp ${u.dur}s ease-out ${u.delay}s infinite`,
+            animation: `floatUp ${m.dur}s ease-out ${m.delay}s infinite`,
           }}
         >
-          {u.emoji}
+          {m.kind === 1 ? (
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: m.size,
+                fontWeight: 700,
+                color: m.color,
+              }}
+            >
+              &gt;&gt;
+            </span>
+          ) : (
+            <div
+              style={{
+                width: m.size,
+                height: m.size,
+                background: m.kind === 0 ? m.color : "transparent",
+                border: m.kind === 2 ? `2px solid ${m.color}` : "none",
+                borderRadius: m.kind === 2 ? "50%" : 0,
+              }}
+            />
+          )}
         </div>
       ))}
     </div>
@@ -383,13 +407,13 @@ function SadRain({ active }) {
             position: "absolute",
             left: `${d.left}%`,
             top: -20,
-            fontSize: 16,
+            width: 1,
+            height: 18,
+            background: "rgba(143,160,255,0.5)",
             opacity: 0.4,
             animation: `floatUp ${d.dur}s linear ${d.delay}s infinite reverse`,
           }}
-        >
-          💧
-        </div>
+        />
       ))}
     </div>
   );
@@ -516,13 +540,14 @@ function LockScreen({ voterName, onUnlock }) {
         gap: 24,
       }}
     >
-      <div style={{ fontSize: 64 }}>🔒</div>
+      <TenkaraLogo size={28} />
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: 3, color: "#0011FF" }}>CONFIDENTIAL — IDENTITY CHECK</span>
       <h2
         style={{
-          color: "#fff",
-          fontWeight: 900,
+          color: "#FFFAD0",
+          fontWeight: 500,
           fontSize: 28,
-          fontFamily: "'Trebuchet MS', sans-serif",
+          fontFamily: "var(--font-display)",
         }}
       >
         Confidential Ballot
@@ -583,7 +608,7 @@ function LockScreen({ voterName, onUnlock }) {
           fontFamily: "'Trebuchet MS', sans-serif",
         }}
       >
-        Unlock & Vote 🗳️
+        Unlock &amp; Vote
       </button>
     </div>
   );
@@ -628,17 +653,12 @@ function ScratchCard({ width, height, onComplete, children, color = "gold" }) {
       ctx.fill();
     }
 
-    for (let i = 0; i < 12; i++) {
-      const x = Math.random() * width;
-      const y = Math.random() * height;
-      ctx.font = `${Math.random() * 14 + 16}px serif`;
-      ctx.fillText(["✨", "⭐", "💫", "🌟", "🎰", "🎁", "🎊"][Math.floor(Math.random() * 7)], x, y);
-    }
-
     ctx.fillStyle = "rgba(255,255,255,0.25)";
-    ctx.font = `bold ${Math.min(22, width / 20)}px Trebuchet MS`;
+    ctx.font = `bold ${Math.min(20, width / 22)}px "Space Mono", monospace`;
     ctx.textAlign = "center";
-    ctx.fillText("✨ SCRATCH TO REVEAL ✨", width / 2, height / 2 + 8);
+    ctx.fillText("SCRATCH TO REVEAL", width / 2, height / 2 + 8);
+    ctx.font = `${Math.min(12, width / 36)}px "Space Mono", monospace`;
+    ctx.fillText(">>>>>>>", width / 2, height / 2 + 30);
 
     ctx.strokeStyle = "rgba(255,255,255,0.15)";
     ctx.lineWidth = 1;
@@ -721,10 +741,10 @@ function SpinWheel({ names, onComplete }) {
   const animRef = useRef(null);
 
   const colors = [
-    "#FF6B6B", "#4ECDC4", "#FFE66D", "#45B7D1", "#96CEB4",
-    "#DDA0DD", "#F7DC6F", "#BB8FCE", "#82E0AA", "#F0B27A",
-    "#85C1E9", "#F1948A", "#A8DFEB", "#FAD7A0", "#98D8C8",
-    "#D2B4DE", "#A9DFBF", "#AED6F1", "#F9E79F", "#FFEAA7",
+    "#8FA0FF", "#FFFAD0", "#6E84FF", "#C7CEFF", "#5B73FF",
+    "#E6E2C0", "#A8B4FF", "#7C8FFF", "#9AA8FF", "#B9C2FF",
+    "#6478F5", "#D6DBFF", "#8294FF", "#EFEAC4", "#7184FF",
+    "#AEB9FF", "#5F77F5", "#CDD4FF", "#9DABFF", "#7E91FF",
   ];
 
   useEffect(() => {
@@ -763,7 +783,7 @@ function SpinWheel({ names, onComplete }) {
       ctx.rotate(start + sliceAngle / 2);
       ctx.textAlign = "right";
       ctx.fillStyle = "#000";
-      ctx.font = `bold ${Math.min(16, 200 / items.length)}px Trebuchet MS`;
+      ctx.font = `bold ${Math.min(16, 200 / items.length)}px "Space Mono", monospace`;
       ctx.fillText(name, r - 14, 5);
       ctx.restore();
     });
@@ -774,9 +794,9 @@ function SpinWheel({ names, onComplete }) {
     ctx.lineTo(cx + r + 25, cy - 12);
     ctx.lineTo(cx + r + 25, cy + 12);
     ctx.closePath();
-    ctx.fillStyle = "#FFE66D";
+    ctx.fillStyle = "#0011FF";
     ctx.fill();
-    ctx.strokeStyle = "#000";
+    ctx.strokeStyle = "#FFFAD0";
     ctx.lineWidth = 2;
     ctx.stroke();
   }
@@ -1537,7 +1557,7 @@ export default function VibeShowdown() {
       onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,50,50,0.3)"; e.currentTarget.style.color = "#fff"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,50,50,0.15)"; e.currentTarget.style.color = "rgba(255,100,100,0.7)"; }}
     >
-      🔄 Reset
+      Reset
     </button>
   ) : null;
 
@@ -1645,10 +1665,10 @@ export default function VibeShowdown() {
               <TenkaraLogo size={30} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <TechTag>Vibe Code Showdown · Edition 01</TechTag>
+              <TechTag>Automation Dept. · Edition 02 · Field Tested</TechTag>
             </div>
             <h1 style={{ ...S.title, fontSize: 64, margin: "0 0 12px" }}>
-              The Best<br />Vibe-Coded App
+              Tenkara<br />Talent Show
             </h1>
             <p
               style={{
@@ -1659,7 +1679,7 @@ export default function VibeShowdown() {
                 letterSpacing: 1,
               }}
             >
-              Field-tested judging. Five categories. One winner.
+              FIELD-TESTED JUDGING — FIVE CATEGORIES — ONE WINNER
             </p>
           </div>
 
@@ -1872,10 +1892,10 @@ export default function VibeShowdown() {
                 ...S.btn(),
                 fontSize: 20,
                 padding: "18px 56px",
-                boxShadow: "0 6px 32px rgba(255,107,107,0.4)",
+                boxShadow: "0 6px 32px rgba(0,17,255,0.4)",
               }}
             >
-              🎤 START THE SHOW
+              Start the Show
             </button>
             {people.length < 2 && (
               <p
@@ -1913,6 +1933,7 @@ export default function VibeShowdown() {
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <TenkaraLogo size={24} />
             </div>
+            <div style={{ marginBottom: 12 }}><TechTag>Tenkara Talent Show · Edition 02</TechTag></div>
             <h1 style={{ ...S.title, fontSize: 48, margin: "0 0 8px" }}>
               Claim Your Name
             </h1>
@@ -1921,12 +1942,12 @@ export default function VibeShowdown() {
                 ? "NAMES LOCKED — AWAITING PRESENTATION ORDER…"
                 : "TAP YOUR NAME TO JOIN THE SESSION"}
             </p>
-            <div style={{ marginTop: 16, display: "inline-flex", gap: 24, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: "10px 20px", fontSize: 14 }}>
-              <span style={{ color: "#4ECDC4" }}>
-                ✅ <strong>{claimedCount}</strong> joined
+            <div style={{ marginTop: 16, display: "inline-flex", gap: 24, background: "rgba(0,17,255,0.08)", border: "1px solid rgba(0,17,255,0.25)", borderRadius: 6, padding: "10px 20px", fontSize: 13, fontFamily: "var(--font-mono)", letterSpacing: 1 }}>
+              <span style={{ color: "#8FA0FF", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#0011FF", display: "inline-block" }} /><strong>{claimedCount}</strong> JOINED
               </span>
-              <span style={{ color: "rgba(255,255,255,0.4)" }}>
-                ⏳ <strong>{voterOrder.length - claimedCount}</strong> unclaimed
+              <span style={{ color: "rgba(255,250,208,0.4)", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", border: "1px solid rgba(255,250,208,0.4)", display: "inline-block" }} /><strong>{voterOrder.length - claimedCount}</strong> UNCLAIMED
               </span>
             </div>
           </div>
@@ -1945,16 +1966,16 @@ export default function VibeShowdown() {
                     background: disabled
                       ? "rgba(255,255,255,0.04)"
                       : isCeoName
-                        ? "linear-gradient(135deg, rgba(255,230,109,0.15), rgba(255,107,107,0.1))"
+                        ? "linear-gradient(135deg, rgba(255,250,208,0.16), rgba(255,250,208,0.06))"
                         : `linear-gradient(135deg, ${color}22, ${color}11)`,
                     border: claimed
-                      ? isCeoName ? "2px solid rgba(255,230,109,0.5)" : "2px dashed rgba(78,205,196,0.3)"
+                      ? isCeoName ? "1px solid rgba(255,250,208,0.5)" : "1px dashed rgba(0,17,255,0.4)"
                       : lockedOut ? "1px solid rgba(255,255,255,0.07)"
-                      : isCeoName ? "2px solid rgba(255,230,109,0.6)" : `2px solid ${color}55`,
-                    borderRadius: 18, padding: "18px 14px", cursor: disabled ? "default" : "pointer",
+                      : isCeoName ? "1px solid rgba(255,250,208,0.6)" : `1px solid ${color}66`,
+                    borderRadius: 6, padding: "18px 14px", cursor: disabled ? "default" : "pointer",
                     textAlign: "center", transition: "transform 0.15s, box-shadow 0.15s",
                     opacity: disabled ? (claimed ? 0.7 : 0.5) : 1, fontFamily: "inherit",
-                    boxShadow: isCeoName && !disabled ? "0 0 20px rgba(255,230,109,0.2)" : "none",
+                    boxShadow: isCeoName && !disabled ? "0 0 20px rgba(255,250,208,0.15)" : "none",
                   }}
                   onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.transform = "translateY(-4px)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
@@ -1962,21 +1983,22 @@ export default function VibeShowdown() {
                   <div style={{
                     width: 52, height: 52, borderRadius: "50%",
                     background: claimed
-                      ? isCeoName ? "linear-gradient(135deg, rgba(255,230,109,0.3), rgba(255,107,107,0.2))" : "rgba(78,205,196,0.2)"
+                      ? isCeoName ? "rgba(255,250,208,0.25)" : "rgba(0,17,255,0.2)"
                       : lockedOut ? "rgba(255,255,255,0.06)"
-                      : isCeoName ? "linear-gradient(135deg, #FFE66D, #FF6B6B)" : color,
+                      : isCeoName ? "#FFFAD0" : color,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    margin: "0 auto 10px", fontSize: isCeoName && !claimed ? 22 : 18, fontWeight: 900,
-                    color: disabled ? (isCeoName && claimed ? "rgba(255,230,109,0.6)" : "rgba(255,255,255,0.3)") : "#000",
-                    boxShadow: isCeoName && !disabled ? "0 4px 16px rgba(255,230,109,0.4)" : disabled ? "none" : `0 4px 16px ${color}66`,
+                    margin: "0 auto 10px", fontSize: isCeoName ? 13 : 18, fontWeight: 900,
+                    fontFamily: isCeoName ? "var(--font-mono)" : "var(--font-body)",
+                    color: disabled ? (isCeoName && claimed ? "rgba(255,250,208,0.6)" : "rgba(255,255,255,0.3)") : "#000",
+                    boxShadow: isCeoName && !disabled ? "0 4px 16px rgba(255,250,208,0.3)" : disabled ? "none" : `0 4px 16px ${color}66`,
                   }}>
-                    {claimed ? (isCeoName ? "👑" : "✓") : lockedOut ? "✕" : isCeoName ? "👑" : initials(p)}
+                    {lockedOut ? "—" : isCeoName ? "CEO" : initials(p)}
                   </div>
-                  <div style={{ color: isCeoName ? (disabled ? "rgba(255,230,109,0.5)" : "#FFE66D") : (disabled ? "rgba(255,255,255,0.3)" : "#fff"), fontWeight: 700, fontSize: 14 }}>
+                  <div style={{ color: isCeoName ? (disabled ? "rgba(255,250,208,0.5)" : "#FFFAD0") : (disabled ? "rgba(255,255,255,0.3)" : "#fff"), fontWeight: 700, fontSize: 14, fontFamily: "var(--font-body)" }}>
                     {p}{isCeoName ? " — CEO" : ""}
                   </div>
-                  <div style={{ fontSize: 11, color: claimed ? (isCeoName ? "#FFE66D" : "#4ECDC4") : lockedOut ? "#FF6B6B" : "rgba(255,255,255,0.35)", marginTop: 4 }}>
-                    {claimed ? (isCeoName ? "CEO Joined 👑" : "Joined ✅") : lockedOut ? "Locked out" : isCeoName ? "👑 Tap to join (CEO)" : "🔒 Tap to join"}
+                  <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", letterSpacing: 1, color: claimed ? (isCeoName ? "#FFFAD0" : "#8FA0FF") : lockedOut ? "#FF0202" : "rgba(255,250,208,0.35)", marginTop: 6, textTransform: "uppercase" }}>
+                    {claimed ? (isCeoName ? "CEO Joined" : "Joined") : lockedOut ? "Locked out" : isCeoName ? "Tap to join (CEO)" : "Tap to join"}
                   </div>
                 </button>
               );
@@ -1985,22 +2007,22 @@ export default function VibeShowdown() {
 
           {/* Share link (CEO only) */}
           {isCeo && sessionId && (
-            <div style={{ maxWidth: 860, margin: "20px auto", ...S.card("rgba(78,205,196,0.06)"), border: "1px solid rgba(78,205,196,0.2)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <span style={{ color: "#4ECDC4", fontWeight: 700, fontSize: 14 }}>📎 Share this link with voters:</span>
-              <code style={{ flex: 1, background: "rgba(0,0,0,0.3)", borderRadius: 8, padding: "8px 12px", color: "#fff", fontSize: 13, wordBreak: "break-all", cursor: "pointer" }}
+            <div style={{ maxWidth: 860, margin: "20px auto", ...S.card("rgba(0,17,255,0.06)"), display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ color: "#8FA0FF", fontWeight: 700, fontSize: 12, fontFamily: "var(--font-mono)", letterSpacing: 1, textTransform: "uppercase" }}>Share link with voters</span>
+              <code style={{ flex: 1, background: "rgba(0,0,0,0.3)", borderRadius: 4, padding: "8px 12px", color: "#FFFAD0", fontSize: 13, wordBreak: "break-all", cursor: "pointer", fontFamily: "var(--font-mono)" }}
                 onClick={() => navigator.clipboard.writeText(window.location.href)} title="Click to copy">
                 {window.location.href}
               </code>
               <button onClick={() => navigator.clipboard.writeText(window.location.href)}
-                style={{ ...S.btn("rgba(78,205,196,0.3)", "#fff"), padding: "8px 16px", fontSize: 13 }}>Copy</button>
+                style={{ ...S.btn("rgba(0,17,255,0.3)", "#fff"), padding: "8px 16px", fontSize: 13 }}>Copy</button>
             </div>
           )}
 
           {/* CEO hint to claim first */}
           {isCeo && !activeVoter && !sessionLocked && (
             <div style={{ textAlign: "center", marginTop: 20 }}>
-              <p style={{ color: "#FFE66D", fontSize: 14, fontWeight: 700 }}>
-                👆 Claim your own name first, then you can lock names & spin the wheel.
+              <p style={{ color: "#FFFAD0", fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: 1, textTransform: "uppercase" }}>
+                Claim your own name first, then lock names &amp; spin the wheel
               </p>
             </div>
           )}
@@ -2009,8 +2031,8 @@ export default function VibeShowdown() {
           {canLock && (
             <div style={{ textAlign: "center", marginTop: 20 }}>
               <button onClick={lockNamesAndRevealPrizes}
-                style={{ ...S.btn("linear-gradient(135deg, #FFE66D, #FF6B6B)"), fontSize: 20, padding: "18px 48px", boxShadow: "0 6px 32px rgba(255,107,107,0.4)", animation: "pulse 2s ease-in-out infinite" }}>
-                🔒 Lock Names & Reveal Prizes ({claimedCount} joined)
+                style={{ ...S.btn(), fontSize: 18, padding: "18px 48px", boxShadow: "0 6px 32px rgba(0,17,255,0.4)", animation: "pulse 2s ease-in-out infinite" }}>
+                Lock Names &amp; Reveal Prizes ({claimedCount} joined)
               </button>
             </div>
           )}
@@ -2259,28 +2281,28 @@ export default function VibeShowdown() {
         {ceoResetBtn}
           <div style={{ ...S.page, maxWidth: 600, margin: "0 auto" }}>
             <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 56, animation: "crownBounce 2s ease-in-out infinite", display: "inline-block" }}>
-                {isSelf ? "🙈" : "✅"}
+              <div style={{ marginBottom: 14 }}>
+                <TechTag color={isSelf ? "#FFFAD0" : "#02FF06"}>{isSelf ? "Now Presenting — You" : "Vote Recorded"}</TechTag>
               </div>
-              <h2 style={{ ...S.title, fontSize: 26, margin: "12px 0 0" }}>
-                {isSelf ? `It's your turn, ${activeVoter}!` : "Vote Submitted!"}
+              <h2 style={{ ...S.title, fontSize: 38, margin: "4px 0 0" }}>
+                {isSelf ? `It's your turn, ${activeVoter}` : "Vote Submitted"}
               </h2>
-              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, margin: "6px 0 0" }}>
+              <p style={{ color: "rgba(255,250,208,0.5)", fontSize: 13, margin: "8px 0 0", fontFamily: "var(--font-mono)", letterSpacing: 1 }}>
                 {isSelf
-                  ? "Sit back while everyone else rates you!"
-                  : "Waiting for everyone else..."}
+                  ? "SIT BACK WHILE EVERYONE ELSE RATES YOU"
+                  : "WAITING FOR EVERYONE ELSE…"}
               </p>
-              <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 13, marginTop: 8 }}>
-                Round {currentRound + 1} of {presentationOrder.length} · Voting on: {currentCandidate}
+              <div style={{ color: "rgba(255,250,208,0.25)", fontSize: 11, marginTop: 8, fontFamily: "var(--font-mono)", letterSpacing: 1 }}>
+                ROUND {currentRound + 1} / {presentationOrder.length} · RATING: {currentCandidate}
               </div>
             </div>
 
             {/* Progress bar */}
-            <div style={{ width: "100%", background: "rgba(255,255,255,0.1)", borderRadius: 12, height: 10, overflow: "hidden", marginBottom: 8 }}>
-              <div style={{ width: `${totalVoters > 0 ? (roundVoteCount / totalVoters) * 100 : 0}%`, height: "100%", background: allRoundVotesIn ? "linear-gradient(90deg, #4ECDC4, #45B7D1)" : "linear-gradient(90deg, #FFE66D, #FF6B6B)", borderRadius: 12, transition: "width 0.5s ease" }} />
+            <div style={{ width: "100%", background: "rgba(255,255,255,0.08)", borderRadius: 0, height: 8, overflow: "hidden", marginBottom: 8 }}>
+              <div style={{ width: `${totalVoters > 0 ? (roundVoteCount / totalVoters) * 100 : 0}%`, height: "100%", background: allRoundVotesIn ? "#02FF06" : "#0011FF", borderRadius: 0, transition: "width 0.5s ease" }} />
             </div>
-            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 14, marginBottom: 20 }}>
-              {roundVoteCount} of {totalVoters} voted
+            <div style={{ textAlign: "center", color: "rgba(255,250,208,0.4)", fontSize: 12, marginBottom: 20, fontFamily: "var(--font-mono)", letterSpacing: 1 }}>
+              {roundVoteCount} OF {totalVoters} VOTED
             </div>
 
             {/* CEO: Voter status panel */}
@@ -2294,23 +2316,24 @@ export default function VibeShowdown() {
                     return (
                       <div key={name} style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "6px 12px", borderRadius: 10,
-                        background: voted ? "rgba(78,205,196,0.08)" : "rgba(255,107,107,0.06)",
-                        border: `1px solid ${voted ? "rgba(78,205,196,0.2)" : "rgba(255,107,107,0.15)"}`,
+                        padding: "6px 12px", borderRadius: 4,
+                        background: voted ? "rgba(0,17,255,0.1)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${voted ? "rgba(0,17,255,0.3)" : "rgba(255,250,208,0.1)"}`,
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <div style={{
                             width: 28, height: 28, borderRadius: "50%",
-                            background: isCeoVoter ? "linear-gradient(135deg, #FFE66D, #FF6B6B)" : AVATAR_COLORS[people.indexOf(name) % AVATAR_COLORS.length],
+                            background: isCeoVoter ? "#FFFAD0" : AVATAR_COLORS[people.indexOf(name) % AVATAR_COLORS.length],
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 9, fontWeight: 900, color: "#000",
-                          }}>{isCeoVoter ? "👑" : initials(name)}</div>
-                          <span style={{ color: voted ? "#4ECDC4" : "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: 13 }}>
+                            fontSize: isCeoVoter ? 8 : 9, fontWeight: 900, color: "#000",
+                            fontFamily: isCeoVoter ? "var(--font-mono)" : "var(--font-body)",
+                          }}>{isCeoVoter ? "CEO" : initials(name)}</div>
+                          <span style={{ color: voted ? "#8FA0FF" : "rgba(255,250,208,0.5)", fontWeight: 600, fontSize: 13 }}>
                             {name}{isCeoVoter ? " (CEO)" : ""}
                           </span>
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: voted ? "#4ECDC4" : "#FF6B6B" }}>
-                          {voted ? "✅ Voted" : "⏳ Waiting"}
+                        <span style={{ fontSize: 10, fontWeight: 700, color: voted ? "#8FA0FF" : "rgba(255,250,208,0.4)", fontFamily: "var(--font-mono)", letterSpacing: 1, textTransform: "uppercase" }}>
+                          {voted ? "Voted" : "Waiting"}
                         </span>
                       </div>
                     );
@@ -2328,19 +2351,19 @@ export default function VibeShowdown() {
             {isCeo && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {allRoundVotesIn ? (
-                  <div style={{ ...S.card("rgba(255,230,109,0.1)"), border: "1px solid rgba(255,230,109,0.3)", textAlign: "center" }}>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: "#FFE66D", marginBottom: 8 }}>All votes are in!</div>
+                  <div style={{ ...S.card("rgba(2,255,6,0.06)"), border: "1px solid rgba(2,255,6,0.3)", textAlign: "center" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#02FF06", marginBottom: 10, fontFamily: "var(--font-mono)", letterSpacing: 2, textTransform: "uppercase" }}>All Votes Are In</div>
                     <button
                       onClick={isLastRound ? calculateAndReveal : advanceRound}
-                      style={{ ...S.btn(), fontSize: 18, padding: "14px 40px", animation: "pulse 2s ease-in-out infinite" }}
+                      style={{ ...S.btn(), fontSize: 16, padding: "14px 40px", animation: "pulse 2s ease-in-out infinite" }}
                     >
-                      {isLastRound ? "🎪 See Results!" : `➡️ Next: ${presentationOrder[currentRound + 1]}`}
+                      {isLastRound ? "See Results" : `Next: ${presentationOrder[currentRound + 1]}`}
                     </button>
                   </div>
                 ) : (
-                  <div style={{ ...S.card("rgba(255,107,107,0.06)"), border: "1px solid rgba(255,107,107,0.15)", textAlign: "center" }}>
-                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
-                      Tired of waiting? Move on with {roundVoteCount} of {totalVoters} votes.
+                  <div style={{ ...S.card("rgba(255,255,255,0.03)"), textAlign: "center" }}>
+                    <div style={{ fontSize: 12, color: "rgba(255,250,208,0.4)", marginBottom: 10, fontFamily: "var(--font-mono)", letterSpacing: 1 }}>
+                      Move on with {roundVoteCount} of {totalVoters} votes?
                     </div>
                     <button
                       onClick={() => {
@@ -2348,9 +2371,9 @@ export default function VibeShowdown() {
                         if (isLastRound) calculateAndReveal();
                         else advanceRound();
                       }}
-                      style={{ ...S.btn("rgba(255,107,107,0.2)", "#FF6B6B"), fontSize: 14, padding: "10px 28px" }}
+                      style={{ ...S.btn("rgba(255,2,2,0.15)", "#FF0202"), fontSize: 13, padding: "10px 28px" }}
                     >
-                      ⚡ Force {isLastRound ? "Results" : "Next"} ({pendingList.length} missing)
+                      Force {isLastRound ? "Results" : "Next"} ({pendingList.length} missing)
                     </button>
                   </div>
                 )}
@@ -2373,9 +2396,9 @@ export default function VibeShowdown() {
                 {activeVoter ? initials(activeVoter) : "?"}
               </div>
               <div>
-                <div style={{ color: "#fff", fontWeight: 800, fontSize: 16 }}>{activeVoter}{isCeo ? " 👑" : ""}</div>
-                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
-                  Round {currentRound + 1} of {presentationOrder.length} · 🔒 Confidential
+                <div style={{ color: "#FFFAD0", fontWeight: 700, fontSize: 16 }}>{activeVoter}{isCeo ? " · CEO" : ""}</div>
+                <div style={{ color: "rgba(255,250,208,0.4)", fontSize: 11, fontFamily: "var(--font-mono)", letterSpacing: 1, textTransform: "uppercase" }}>
+                  Round {currentRound + 1} / {presentationOrder.length} · Confidential
                 </div>
               </div>
             </div>
@@ -2384,23 +2407,24 @@ export default function VibeShowdown() {
               {presentationOrder.map((p, i) => (
                 <div key={p} style={{
                   width: 20, height: 20, borderRadius: "50%",
-                  background: i === currentRound ? candidateColor : i < currentRound ? "rgba(78,205,196,0.5)" : "rgba(255,255,255,0.1)",
-                  border: i === currentRound ? "2px solid #fff" : "1px solid rgba(255,255,255,0.1)",
-                  fontSize: 7, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center",
-                  color: i === currentRound ? "#000" : "rgba(255,255,255,0.4)",
-                }} title={p}>{i < currentRound ? "✓" : i + 1}</div>
+                  background: i === currentRound ? candidateColor : i < currentRound ? "rgba(0,17,255,0.6)" : "rgba(255,255,255,0.08)",
+                  border: i === currentRound ? "2px solid #FFFAD0" : "1px solid rgba(255,250,208,0.12)",
+                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "var(--font-mono)",
+                  color: i === currentRound ? "#000" : "rgba(255,250,208,0.4)",
+                }} title={p}>{i < currentRound ? "" : i + 1}</div>
               ))}
             </div>
           </div>
 
           {/* CEO live vote count */}
           {isCeo && (
-            <div style={{ marginBottom: 20, background: "rgba(255,230,109,0.08)", border: "1px solid rgba(255,230,109,0.2)", borderRadius: 14, padding: "10px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <span style={{ color: "#FFE66D", fontWeight: 700, fontSize: 14 }}>
-                🗳️ Live: {roundVoteCount} of {totalVoters} voted
+            <div style={{ marginBottom: 20, background: "rgba(0,17,255,0.08)", border: "1px solid rgba(0,17,255,0.25)", borderRadius: 6, padding: "10px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <span style={{ color: "#8FA0FF", fontWeight: 700, fontSize: 12, fontFamily: "var(--font-mono)", letterSpacing: 1.5, textTransform: "uppercase" }}>
+                Live · {roundVoteCount} of {totalVoters} voted
               </span>
-              <div style={{ width: 200, background: "rgba(255,255,255,0.1)", borderRadius: 8, height: 6, overflow: "hidden" }}>
-                <div style={{ width: `${totalVoters > 0 ? (roundVoteCount / totalVoters) * 100 : 0}%`, height: "100%", background: allRoundVotesIn ? "#4ECDC4" : "#FFE66D", borderRadius: 8, transition: "width 0.5s ease" }} />
+              <div style={{ width: 200, background: "rgba(255,255,255,0.08)", borderRadius: 0, height: 6, overflow: "hidden" }}>
+                <div style={{ width: `${totalVoters > 0 ? (roundVoteCount / totalVoters) * 100 : 0}%`, height: "100%", background: allRoundVotesIn ? "#02FF06" : "#0011FF", borderRadius: 0, transition: "width 0.5s ease" }} />
               </div>
             </div>
           )}
@@ -2413,13 +2437,13 @@ export default function VibeShowdown() {
                   {initials(currentCandidate)}
                 </div>
                 <div>
-                  <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>Now Rating</div>
-                  <div style={{ color: "#fff", fontWeight: 900, fontSize: 26, lineHeight: 1.1 }}>{currentCandidate}</div>
+                  <div style={{ color: "rgba(0,17,255,0.85)", fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", fontFamily: "var(--font-mono)" }}>Now Rating</div>
+                  <div style={{ color: "#FFFAD0", fontWeight: 500, fontSize: 30, lineHeight: 1.1, fontFamily: "var(--font-display)" }}>{currentCandidate}</div>
                 </div>
                 <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                  <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12 }}>Your score</div>
-                  <div style={{ fontSize: 36, fontWeight: 900, color: roundTotal >= 20 ? "#4ECDC4" : roundTotal >= 12 ? "#FFE66D" : "#FF6B6B" }}>
-                    {roundTotal}<span style={{ fontSize: 16, color: "rgba(255,255,255,0.3)", fontWeight: 400 }}>/25</span>
+                  <div style={{ color: "rgba(255,250,208,0.3)", fontSize: 10, fontFamily: "var(--font-mono)", letterSpacing: 1, textTransform: "uppercase" }}>Your score</div>
+                  <div style={{ fontSize: 36, fontWeight: 700, fontFamily: "var(--font-mono)", color: roundTotal >= 20 ? "#02FF06" : roundTotal >= 12 ? "#FFFAD0" : "#8FA0FF" }}>
+                    {roundTotal}<span style={{ fontSize: 16, color: "rgba(255,250,208,0.3)", fontWeight: 400 }}>/25</span>
                   </div>
                 </div>
               </div>
@@ -2430,9 +2454,9 @@ export default function VibeShowdown() {
                   <div key={cat.id} style={{ marginBottom: 24 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                       <div>
-                        <span style={{ fontSize: 18, marginRight: 8 }}>{cat.icon}</span>
-                        <strong style={{ color: "#fff", fontSize: 15 }}>{cat.name}</strong>
-                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>{cat.desc}</div>
+                        <span style={{ fontSize: 12, marginRight: 8, fontFamily: "var(--font-mono)", color: "#0011FF", fontWeight: 700 }}>{cat.icon}</span>
+                        <strong style={{ color: "#FFFAD0", fontSize: 15 }}>{cat.name}</strong>
+                        <div style={{ fontSize: 12, color: "rgba(255,250,208,0.4)", marginTop: 2 }}>{cat.desc}</div>
                       </div>
                       <div style={{
                         width: 44, height: 44, borderRadius: 12, flexShrink: 0,
@@ -2459,11 +2483,11 @@ export default function VibeShowdown() {
                 onClick={() => { if (roundComplete && !submitting) submitRoundVote(); }}
                 disabled={!roundComplete || submitting}
                 style={{
-                  ...S.btn(roundComplete ? "linear-gradient(135deg, #4ECDC4, #45B7D1)" : "rgba(255,255,255,0.1)", roundComplete ? "#000" : "rgba(255,255,255,0.3)"),
+                  ...S.btn(roundComplete ? "#0011FF" : "rgba(255,255,255,0.1)", roundComplete ? "#FFFAD0" : "rgba(255,255,255,0.3)"),
                   width: "100%", marginTop: 8, opacity: (roundComplete && !submitting) ? 1 : 0.5, cursor: (roundComplete && !submitting) ? "pointer" : "not-allowed",
                 }}
               >
-                {submitting ? "Submitting…" : `✅ Submit Vote for ${currentCandidate}`}
+                {submitting ? "Submitting…" : `Submit Vote — ${currentCandidate}`}
               </button>
               {voteError && (
                 <button
@@ -2473,7 +2497,7 @@ export default function VibeShowdown() {
                     width: "100%", marginTop: 8,
                   }}
                 >
-                  ⚠️ {voteError}
+                  {voteError}
                 </button>
               )}
             </div>
@@ -2481,11 +2505,11 @@ export default function VibeShowdown() {
             {/* RIGHT: Rubric sidebar */}
             <div style={{ position: "sticky", top: 24 }}>
               <div style={S.card("rgba(255,255,255,0.05)")}>
-                <span style={S.label}>📋 Scoring Guide</span>
+                <span style={S.label}>Scoring Guide</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {CATEGORIES.map((cat, ci) => (
-                    <div key={cat.id} style={{ borderLeft: `3px solid ${AVATAR_COLORS[(ci * 4) % AVATAR_COLORS.length]}`, paddingLeft: 12 }}>
-                      <div style={{ fontWeight: 800, color: "#fff", fontSize: 14, marginBottom: 4 }}>{cat.icon} {cat.name}</div>
+                    <div key={cat.id} style={{ borderLeft: `2px solid ${AVATAR_COLORS[(ci * 4) % AVATAR_COLORS.length]}`, paddingLeft: 12 }}>
+                      <div style={{ fontWeight: 700, color: "#FFFAD0", fontSize: 14, marginBottom: 4 }}><span style={{ fontFamily: "var(--font-mono)", color: "#0011FF", marginRight: 6 }}>{cat.icon}</span>{cat.name}</div>
                       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>{cat.guide}</div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                         {cat.rubric.map((r, i) => (
@@ -2509,32 +2533,32 @@ export default function VibeShowdown() {
   if (phase === "results") {
     const RANK_STYLES = [
       {
-        bg: "linear-gradient(135deg, #FFD70022, #FFD70008)",
-        border: "#FFD700",
-        glow: "#FFD70066",
-        label: "🥇 CHAMPION",
-        labelColor: "#FFD700",
+        bg: "linear-gradient(135deg, #FFFAD022, #FFFAD008)",
+        border: "#FFFAD0",
+        glow: "#FFFAD066",
+        label: "01 — CHAMPION",
+        labelColor: "#FFFAD0",
       },
       {
-        bg: "linear-gradient(135deg, #C0C0C022, #C0C0C008)",
-        border: "#C0C0C0",
-        glow: "#C0C0C044",
-        label: "🥈 RUNNER-UP",
-        labelColor: "#C0C0C0",
+        bg: "linear-gradient(135deg, #0011FF22, #0011FF08)",
+        border: "#0011FF",
+        glow: "#0011FF66",
+        label: "02 — RUNNER-UP",
+        labelColor: "#8FA0FF",
       },
       {
-        bg: "linear-gradient(135deg, #CD7F3222, #CD7F3208)",
-        border: "#CD7F32",
-        glow: "#CD7F3244",
-        label: "🥉 THIRD PLACE",
-        labelColor: "#CD7F32",
+        bg: "linear-gradient(135deg, #8FA0FF22, #8FA0FF08)",
+        border: "#8FA0FF",
+        glow: "#8FA0FF44",
+        label: "03 — THIRD PLACE",
+        labelColor: "#8FA0FF",
       },
     ];
     const LAST_STYLE = {
-      bg: "rgba(255,50,50,0.06)",
-      border: "rgba(255,50,50,0.2)",
-      label: "😭 LAST PLACE",
-      labelColor: "#ff6b6b",
+      bg: "rgba(255,2,2,0.06)",
+      border: "rgba(255,2,2,0.25)",
+      label: "LAST PLACE",
+      labelColor: "#FF0202",
     };
 
     const revealedCount = revealed.filter(Boolean).length;
@@ -2566,10 +2590,10 @@ export default function VibeShowdown() {
               }}
             >
               {revealedCount === 0
-                ? "Scratch each card to reveal, or auto-reveal all from last to first!"
+                ? "SCRATCH EACH CARD TO REVEAL — OR AUTO-REVEAL LAST TO FIRST"
                 : allRevealed
-                  ? "Congrats to all vibers! 🎉"
-                  : `${revealedCount} of ${results.length} revealed...`}
+                  ? "ALL RESULTS COMPILED — FIELD TESTED"
+                  : `${revealedCount} OF ${results.length} REVEALED…`}
             </p>
           </div>
 
@@ -2588,14 +2612,11 @@ export default function VibeShowdown() {
                 onClick={triggerAutoReveal}
                 disabled={autoRevealing}
                 style={{
-                  ...S.btn(
-                    "linear-gradient(135deg, #FFE66D, #FF6B6B, #4ECDC4)",
-                    "#000"
-                  ),
-                  fontSize: 20,
+                  ...S.btn("#0011FF", "#FFFAD0"),
+                  fontSize: 18,
                   padding: "18px 48px",
                   boxShadow:
-                    "0 8px 40px rgba(255,107,107,0.5), 0 0 0 4px rgba(255,230,109,0.2)",
+                    "0 8px 40px rgba(0,17,255,0.5), 0 0 0 3px rgba(255,250,208,0.2)",
                   animation: autoRevealing
                     ? "none"
                     : "pulse 2s ease-in-out infinite",
@@ -2603,8 +2624,8 @@ export default function VibeShowdown() {
                 }}
               >
                 {autoRevealing
-                  ? "✨ Revealing..."
-                  : "🎰 AUTO REVEAL (Last → First)"}
+                  ? "Revealing…"
+                  : "Auto Reveal (Last → First)"}
               </button>
             </div>
           )}
@@ -2690,43 +2711,43 @@ export default function VibeShowdown() {
                         inset: 0,
                         zIndex: 10,
                         background:
-                          "linear-gradient(135deg, #1a0533 0%, #0d1b4b 50%, #0a3d2e 100%)",
+                          "linear-gradient(135deg, #060a2e 0%, #0011FF 50%, #060a2e 100%)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: 10,
-                        borderRadius: 20,
+                        gap: 8,
+                        borderRadius: 6,
                         animation:
                           revealingIdx === i
                             ? "scratchOff 0.8s ease forwards"
                             : "none",
                       }}
                     >
-                      {[
-                        "🎰",
-                        "🦄",
-                        "🌈",
-                        "✨",
-                        "🎊",
-                        "🎉",
-                        "⭐",
-                        "🚀",
-                        "🔥",
-                        "💫",
-                      ].map((e, j) => (
-                        <span key={j} style={{ fontSize: 24 }}>
-                          {e}
+                      {Array.from({ length: 9 }).map((_, j) => (
+                        <span
+                          key={j}
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 20,
+                            fontWeight: 700,
+                            color: j % 2 ? "#FFFAD0" : "rgba(255,250,208,0.4)",
+                          }}
+                        >
+                          &gt;
                         </span>
                       ))}
                       <div
                         style={{
                           position: "absolute",
-                          color: "rgba(255,255,255,0.25)",
-                          fontSize: 13,
+                          color: "rgba(255,250,208,0.4)",
+                          fontSize: 10,
+                          letterSpacing: 2,
+                          fontFamily: "var(--font-mono)",
+                          textTransform: "uppercase",
                           bottom: 12,
                         }}
                       >
-                        🔒 Locked
+                        Locked
                       </div>
                     </div>
                   )}
@@ -2755,15 +2776,16 @@ export default function VibeShowdown() {
                           alignItems: "center",
                           justifyContent: "center",
                           fontSize:
-                            rank <= 3 ? 26 : isLast ? 22 : 18,
-                          fontWeight: 900,
-                          color: rs ? rs.border : "#666",
+                            rank <= 3 ? 20 : isLast ? 18 : 16,
+                          fontWeight: 700,
+                          fontFamily: "var(--font-mono)",
+                          color: rs ? rs.labelColor : "#888",
                         }}
                       >
                         {rank <= 3
-                          ? ["🥇", "🥈", "🥉"][rank - 1]
+                          ? String(rank).padStart(2, "0")
                           : isLast
-                            ? "😭"
+                            ? "XX"
                             : `#${rank}`}
                       </div>
 
@@ -2896,13 +2918,13 @@ export default function VibeShowdown() {
                         {isLast && (
                           <div style={{ marginTop: 14, textAlign: "center" }}>
                             <div style={{
-                              padding: "16px 20px", background: "rgba(255,50,50,0.08)",
-                              borderRadius: 12, border: "1px solid rgba(255,50,50,0.15)", marginBottom: 8,
+                              padding: "16px 20px", background: "rgba(255,2,2,0.07)",
+                              borderRadius: 6, border: "1px solid rgba(255,2,2,0.2)", marginBottom: 8,
                             }}>
-                              <div style={{ fontSize: 28, marginBottom: 6, animation: "sadDrip 2s ease-in-out infinite" }}>
-                                😢🌧️💔
+                              <div style={{ fontSize: 11, marginBottom: 8, animation: "sadDrip 2s ease-in-out infinite", fontFamily: "var(--font-mono)", letterSpacing: 3, color: "#FF0202", textTransform: "uppercase" }}>
+                                Critical — Last Place
                               </div>
-                              <div style={{ fontSize: 14, color: "#ff6b6b", fontStyle: "italic", marginBottom: penalties[r.name] ? 12 : 0 }}>
+                              <div style={{ fontSize: 15, color: "#FFFAD0", fontStyle: "italic", fontFamily: "var(--font-display)", marginBottom: penalties[r.name] ? 12 : 0 }}>
                                 {SAD_QUOTES[Math.floor(Math.random() * SAD_QUOTES.length)]}
                               </div>
                               {penalties[r.name] && (
@@ -2980,9 +3002,9 @@ export default function VibeShowdown() {
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <button
                 onClick={resetShow}
-                style={{ ...S.btn(), fontSize: 16, padding: "14px 36px" }}
+                style={{ ...S.btn(), fontSize: 14, padding: "14px 36px" }}
               >
-                🔄 New Show
+                New Show
               </button>
             </div>
           )}
@@ -3011,32 +3033,39 @@ export default function VibeShowdown() {
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 72 }}>🎪</div>
-          <h1 style={{ ...S.title, fontSize: 36, margin: 0 }}>
-            VOTING HAS CONCLUDED!
+          <TenkaraLogo size={40} />
+          <div><TechTag color="#02FF06">Session Complete · Field Tested</TechTag></div>
+          <h1 style={{ ...S.title, fontSize: 44, margin: 0 }}>
+            Voting Has Concluded
           </h1>
           <p
             style={{
-              color: "rgba(255,255,255,0.5)",
-              fontSize: 17,
-              maxWidth: 400,
-              lineHeight: 1.6,
+              color: "rgba(255,250,208,0.5)",
+              fontSize: 13,
+              maxWidth: 420,
+              lineHeight: 1.7,
               margin: 0,
+              fontFamily: "var(--font-mono)",
+              letterSpacing: 1,
+              textTransform: "uppercase",
             }}
           >
-            All votes are locked in. Thanks for participating!
+            All votes are locked in. Thanks for participating.
             <br />
-            Ben is about to reveal the results live...
+            Ben is about to reveal the results live…
           </p>
           <div
             style={{
               marginTop: 12,
-              fontSize: 48,
-              animation: "crownBounce 2s ease-in-out infinite",
-              display: "inline-block",
+              fontFamily: "var(--font-mono)",
+              fontSize: 24,
+              fontWeight: 700,
+              letterSpacing: 6,
+              color: "#0011FF",
+              animation: "tkBlink 1.4s steps(1) infinite",
             }}
           >
-            🎪
+            &gt;&gt;&gt;&gt;&gt;&gt;&gt;
           </div>
         </div>
       </div>
