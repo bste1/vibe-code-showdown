@@ -1,3 +1,19 @@
+:root {
+  /* Tenkara brand tokens */
+  --tk-ink: #0a0a0a;
+  --tk-paper: #fffad0;
+  --tk-blue: #0011ff;
+  --tk-blue-bright: #2d4bff;
+  --tk-red: #ff0202;
+  --tk-orange: #ff4800;
+  --tk-green: #02ff06;
+  --font-display: "Playfair Display", "PP Editorial New", Georgia, serif;
+  --font-mono: "Space Mono", "Construct Mono", "Geist Mono", ui-monospace,
+    monospace;
+  --font-body: "Inter", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
 *,
 *::before,
 *::after {
@@ -8,8 +24,9 @@
 
 body {
   min-height: 100vh;
-  background: #0d0d0d;
+  background: #050505;
   overflow-x: hidden;
+  font-family: var(--font-body);
 }
 
 ::-webkit-scrollbar {
@@ -19,8 +36,59 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+  background: rgba(0, 17, 255, 0.5);
+  border-radius: 0;
+}
+
+/* Tenkara halftone + grid background layers */
+.tk-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(0, 17, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 17, 255, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(
+    ellipse 80% 70% at 50% 40%,
+    #000 30%,
+    transparent 80%
+  );
+}
+.tk-halftone {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    rgba(0, 17, 255, 0.55) 1px,
+    transparent 1.4px
+  );
+  background-size: 7px 7px;
+  opacity: 0.18;
+  mask-image: radial-gradient(ellipse 60% 50% at 70% 10%, #000, transparent 75%);
+  -webkit-mask-image: radial-gradient(
+    ellipse 60% 50% at 70% 10%,
+    #000,
+    transparent 75%
+  );
+}
+
+@keyframes tkScan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+@keyframes tkBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
 }
 
 @keyframes twinkle {

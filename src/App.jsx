@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { supabase } from "./supabase";
+import { supabase, fetchAllRows, withRetry } from "./supabase";
 
 /* ─── DATA ─────────────────────────────────────────────────────── */
 const CATEGORIES = [
@@ -120,27 +120,28 @@ const DEFAULT_PENALTIES = {
   "Mildred": "1 Frog (boiled, unflavored, no sauce, not skinned)",
 };
 
+// Tenkara palette — electric blue forward, cream, with signal accents
 const AVATAR_COLORS = [
-  "#FF6B6B",
-  "#4ECDC4",
-  "#45B7D1",
-  "#96CEB4",
-  "#FFEAA7",
-  "#DDA0DD",
-  "#98D8C8",
-  "#F7DC6F",
-  "#BB8FCE",
-  "#85C1E9",
-  "#F0B27A",
-  "#82E0AA",
-  "#F1948A",
-  "#85C1E9",
-  "#D2B4DE",
-  "#A9DFBF",
-  "#FAD7A0",
-  "#AED6F1",
-  "#F9E79F",
-  "#A8DFEB",
+  "#0011FF",
+  "#FFFAD0",
+  "#2D4BFF",
+  "#FF4800",
+  "#02FF06",
+  "#FF0202",
+  "#5B73FF",
+  "#FFD000",
+  "#1A2BCC",
+  "#8FA0FF",
+  "#FF7A3D",
+  "#3DFF8A",
+  "#0011FF",
+  "#FFE066",
+  "#4C63FF",
+  "#FFFAD0",
+  "#FF5252",
+  "#7C8FFF",
+  "#22D4FF",
+  "#2D4BFF",
 ];
 
 const SAD_QUOTES = [
@@ -396,17 +397,6 @@ function SadRain({ active }) {
 
 /* ─── STAR BG ───────────────────────────────────────────────────── */
 function StarBg() {
-  const stars = useRef(
-    Array.from({ length: 50 }, () => ({
-      w: Math.random() * 3 + 1,
-      h: Math.random() * 3 + 1,
-      left: `${Math.random() * 100}%`,
-      top: `${Math.random() * 100}%`,
-      opacity: Math.random() * 0.5 + 0.1,
-      dur: `${Math.random() * 3 + 2}s`,
-      delay: `${Math.random() * 3}s`,
-    }))
-  );
   return (
     <div
       style={{
@@ -417,24 +407,92 @@ function StarBg() {
         pointerEvents: "none",
       }}
     >
-      {stars.current.map((s, i) => (
-        <div
-          key={i}
-          style={{
-            position: "absolute",
-            width: s.w,
-            height: s.h,
-            borderRadius: "50%",
-            background: "#fff",
-            left: s.left,
-            top: s.top,
-            opacity: s.opacity,
-            animation: `twinkle ${s.dur} ease-in-out infinite`,
-            animationDelay: s.delay,
-          }}
-        />
-      ))}
+      <div className="tk-grid" />
+      <div className="tk-halftone" />
+      {/* Corner registration / serial annotations */}
+      <div
+        style={{
+          position: "absolute",
+          top: 14,
+          right: 16,
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: 1.5,
+          color: "rgba(0,17,255,0.55)",
+          textAlign: "right",
+          lineHeight: 1.6,
+        }}
+      >
+        STATUS: LIVE<br />
+        V 1.3 · FIELD&nbsp;TESTED
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          bottom: 14,
+          left: 16,
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: 1.5,
+          color: "rgba(255,250,208,0.28)",
+        }}
+      >
+        EVERY VALUE HAS INTENT — NOTHING IS DECORATIVE
+      </div>
     </div>
+  );
+}
+
+/* ─── TENKARA LOGO (infinity / knot mark + wordmark) ─────────── */
+function TenkaraLogo({ size = 28, showWordmark = true, color = "#FFFAD0" }) {
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+      <svg
+        width={size * 1.7}
+        height={size}
+        viewBox="0 0 100 60"
+        fill="none"
+        style={{ display: "block" }}
+      >
+        <circle cx="34" cy="30" r="20" stroke="#0011FF" strokeWidth="9" />
+        <circle cx="66" cy="30" r="20" stroke={color} strokeWidth="9" />
+      </svg>
+      {showWordmark && (
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: size * 0.92,
+            fontWeight: 500,
+            color,
+            letterSpacing: "-0.5px",
+          }}
+        >
+          Tenkara
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ─── Small technical mono tag, Tenkara-style ────────────────── */
+function TechTag({ children, color = "#0011FF" }) {
+  return (
+    <span
+      style={{
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        letterSpacing: 2,
+        textTransform: "uppercase",
+        color,
+        border: `1px solid ${color}`,
+        borderRadius: 3,
+        padding: "3px 8px",
+        display: "inline-block",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -851,6 +909,8 @@ export default function VibeShowdown() {
   const [currentRound, setCurrentRound] = useState(0);
   const [roundScores, setRoundScores] = useState({});
   const [myVoteSubmitted, setMyVoteSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [voteError, setVoteError] = useState(null);
   const [roundVoteCount, setRoundVoteCount] = useState(0);
   const [roundVotedNames, setRoundVotedNames] = useState(new Set());
   const [totalVoters, setTotalVoters] = useState(0);
@@ -868,6 +928,9 @@ export default function VibeShowdown() {
   const subscriptionRef = useRef(null);
   const sessionSubRef = useRef(null);
   const votesSubRef = useRef(null);
+  const voteCountDebounceRef = useRef(null);
+  const votePollRef = useRef(null);
+  const claimsPollRef = useRef(null);
 
   const participants = people.filter((p) => p !== CEO_NAME);
   const allVoters = [...people, ...(people.includes(CEO_NAME) ? [] : [CEO_NAME])];
@@ -1014,6 +1077,7 @@ export default function VibeShowdown() {
             setCurrentRound(row.current_round);
             setMyVoteSubmitted(false);
             setRoundScores({});
+            setVoteError(null);
           }
           if (row.presentation_order && row.presentation_order.length > 0) {
             setPresentationOrder(row.presentation_order);
@@ -1037,7 +1101,15 @@ export default function VibeShowdown() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "votes", filter: `session_id=eq.${sid}` },
-        () => loadRoundVoteCount(sid, candidateName)
+        () => {
+          // Debounce: a single submit fires 5 INSERTs; many voters at once
+          // would otherwise trigger a query storm on every connected device.
+          if (voteCountDebounceRef.current) clearTimeout(voteCountDebounceRef.current);
+          voteCountDebounceRef.current = setTimeout(
+            () => loadRoundVoteCount(sid, candidateName),
+            500
+          );
+        }
       )
       .subscribe();
     votesSubRef.current = channel;
@@ -1060,8 +1132,22 @@ export default function VibeShowdown() {
       if (subscriptionRef.current) supabase.removeChannel(subscriptionRef.current);
       if (sessionSubRef.current) supabase.removeChannel(sessionSubRef.current);
       if (votesSubRef.current) supabase.removeChannel(votesSubRef.current);
+      if (votePollRef.current) clearInterval(votePollRef.current);
+      if (claimsPollRef.current) clearInterval(claimsPollRef.current);
     };
   }, []);
+
+  // Polling fallback for the claim/join count during login, so the CEO sees an
+  // accurate "joined" tally before locking even under a burst of 40 joins.
+  useEffect(() => {
+    if ((phase === "login" || phase === "setup") && sessionId) {
+      if (claimsPollRef.current) clearInterval(claimsPollRef.current);
+      claimsPollRef.current = setInterval(() => loadClaims(sessionId), 4000);
+      return () => {
+        if (claimsPollRef.current) clearInterval(claimsPollRef.current);
+      };
+    }
+  }, [phase, sessionId]);
 
   // Auto-transition to voting when presentation_order is set and voter has claimed
   useEffect(() => {
@@ -1089,6 +1175,17 @@ export default function VibeShowdown() {
             setMyVoteSubmitted(data && data.length > 0);
           });
       }
+
+      // Polling fallback: at 40 concurrent voters, Supabase realtime can
+      // throttle/drop postgres_changes events. Poll the live count every 3s
+      // so the CEO's "X of Y voted" gauge stays accurate regardless.
+      if (votePollRef.current) clearInterval(votePollRef.current);
+      votePollRef.current = setInterval(() => {
+        loadRoundVoteCount(sessionId, currentCandidate);
+      }, 3000);
+      return () => {
+        if (votePollRef.current) clearInterval(votePollRef.current);
+      };
     }
   }, [phase, sessionId, currentRound, currentCandidate]);
 
@@ -1168,11 +1265,13 @@ export default function VibeShowdown() {
     setShowLock(false);
     const voter = pendingVoter;
 
-    const { error } = await supabase.from("claims").insert({
-      session_id: sessionId,
-      voter_name: voter,
-      status: "claimed",
-    });
+    const { error } = await withRetry(() =>
+      supabase.from("claims").insert({
+        session_id: sessionId,
+        voter_name: voter,
+        status: "claimed",
+      })
+    );
 
     if (error) {
       if (error.code === "23505") {
@@ -1180,6 +1279,7 @@ export default function VibeShowdown() {
         return;
       }
       console.error("Claim failed", error);
+      alert("Couldn't join — check your connection and try again.");
       return;
     }
 
@@ -1203,7 +1303,7 @@ export default function VibeShowdown() {
   async function submitRoundVote() {
     const voter = activeVoter;
     const candidate = currentCandidate;
-    if (!voter || !candidate) return;
+    if (!voter || !candidate || submitting) return;
 
     const rows = CATEGORIES.map((cat) => ({
       session_id: sessionId,
@@ -1214,11 +1314,24 @@ export default function VibeShowdown() {
       is_ceo: isCeo,
     }));
 
-    const { error } = await supabase.from("votes").upsert(rows, {
-      onConflict: "session_id,voter_name,participant_name,category_id",
-    });
-    if (error) console.error("Vote write failed", error);
+    setSubmitting(true);
+    setVoteError(null);
 
+    // Retry on transient failures so votes don't silently vanish under load.
+    const { error } = await withRetry(() =>
+      supabase.from("votes").upsert(rows, {
+        onConflict: "session_id,voter_name,participant_name,category_id",
+      })
+    );
+
+    if (error) {
+      console.error("Vote write failed", error);
+      setSubmitting(false);
+      setVoteError("Your vote didn't go through. Tap to try again.");
+      return;
+    }
+
+    setSubmitting(false);
     setMyVoteSubmitted(true);
     setRoundScores({});
   }
@@ -1238,37 +1351,44 @@ export default function VibeShowdown() {
   }
 
   async function calculateAndReveal() {
-    const { data: allVoteRows } = await supabase
-      .from("votes")
-      .select("*")
-      .eq("session_id", sessionId);
+    let allVoteRows;
+    try {
+      // Page past the 1000-row cap so large sessions tally every vote.
+      allVoteRows = await fetchAllRows("votes", (q) =>
+        q.eq("session_id", sessionId)
+      );
+    } catch (e) {
+      console.error("Failed to load votes for results", e);
+      alert("Couldn't load all votes — check your connection and try again.");
+      return;
+    }
 
     if (!allVoteRows) return;
 
-    const ceoVoterName = activeVoter;
-    const ceoVotes = allVoteRows.filter((v) => v.is_ceo);
-    const teamVotes = allVoteRows.filter((v) => !v.is_ceo);
+    // Index every row once: O(N) instead of nested find/filter scans.
+    // At 40 voters (~7,800 rows) the naive version did tens of millions of
+    // comparisons and could freeze the CEO screen on reveal.
+    const ceoIndex = {}; // participant -> { catId: score }
+    const teamIndex = {}; // participant -> { voter -> { catId: score } }
+    for (const v of allVoteRows) {
+      if (v.is_ceo) {
+        (ceoIndex[v.participant_name] ||= {})[v.category_id] = v.score;
+      } else {
+        const byVoter = (teamIndex[v.participant_name] ||= {});
+        (byVoter[v.voter_name] ||= {})[v.category_id] = v.score;
+      }
+    }
 
     const scored = participants.map((p) => {
-      const ceoForP = {};
-      ceoVotes
-        .filter((v) => v.participant_name === p)
-        .forEach((v) => { ceoForP[v.category_id] = v.score; });
+      const ceoForP = ceoIndex[p] || {};
       const ceoTotal = CATEGORIES.reduce((s, c) => s + (ceoForP[c.id] || 0), 0);
 
-      const voterNames = [
-        ...new Set(
-          teamVotes.filter((v) => v.participant_name === p).map((v) => v.voter_name)
-        ),
-      ];
+      const voterMap = teamIndex[p] || {};
+      const voterNames = Object.keys(voterMap);
+
       const catMeans = CATEGORIES.map((cat) => {
         const vals = voterNames
-          .map((vn) => {
-            const row = teamVotes.find(
-              (v) => v.voter_name === vn && v.participant_name === p && v.category_id === cat.id
-            );
-            return row ? row.score : null;
-          })
+          .map((vn) => voterMap[vn][cat.id])
           .filter((v) => v != null);
         if (!vals.length) return 0;
         return vals.reduce((a, b) => a + b, 0) / vals.length;
@@ -1279,11 +1399,9 @@ export default function VibeShowdown() {
         const scores = {};
         let total = 0;
         CATEGORIES.forEach((cat) => {
-          const row = teamVotes.find(
-            (v) => v.voter_name === vn && v.participant_name === p && v.category_id === cat.id
-          );
-          scores[cat.id] = row ? row.score : 0;
-          total += row ? row.score : 0;
+          const sc = voterMap[vn][cat.id] || 0;
+          scores[cat.id] = sc;
+          total += sc;
         });
         return { name: vn, scores, total };
       });
@@ -1428,8 +1546,9 @@ export default function VibeShowdown() {
     root: {
       minHeight: "100vh",
       background:
-        "linear-gradient(160deg, #1a0533 0%, #0d1b4b 40%, #0a3d2e 100%)",
-      fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
+        "radial-gradient(ellipse 100% 80% at 50% -10%, #0a1033 0%, #060608 55%, #050505 100%)",
+      fontFamily: "var(--font-body)",
+      color: "#FFFAD0",
       position: "relative",
       overflow: "hidden",
     },
@@ -1441,47 +1560,43 @@ export default function VibeShowdown() {
       padding: "32px 24px",
     },
     title: {
-      background:
-        "linear-gradient(90deg, #FFE66D, #FF6B6B, #4ECDC4, #FFE66D)",
-      WebkitBackgroundClip: "text",
-      WebkitTextFillColor: "transparent",
-      backgroundSize: "200%",
-      animation: "rainbowShift 4s ease infinite",
-      fontWeight: 900,
-      letterSpacing: "-0.5px",
+      fontFamily: "var(--font-display)",
+      color: "#FFFAD0",
+      fontWeight: 500,
+      letterSpacing: "-1px",
+      lineHeight: 0.95,
     },
-    card: (color = "rgba(255,255,255,0.07)") => ({
+    card: (color = "rgba(255,250,208,0.035)") => ({
       background: color,
-      border: "1px solid rgba(255,255,255,0.12)",
-      borderRadius: 20,
+      border: "1px solid rgba(0,17,255,0.28)",
+      borderRadius: 6,
       padding: 24,
-      backdropFilter: "blur(12px)",
+      backdropFilter: "blur(8px)",
     }),
-    btn: (
-      bg = "linear-gradient(135deg, #FFE66D, #FF6B6B)",
-      color = "#1a0533"
-    ) => ({
+    btn: (bg = "#0011FF", color = "#FFFAD0") => ({
       background: bg,
       color,
-      border: "none",
-      borderRadius: 14,
+      border: "1px solid rgba(255,250,208,0.18)",
+      borderRadius: 4,
       padding: "14px 32px",
-      fontWeight: 800,
-      fontSize: 16,
+      fontWeight: 700,
+      fontSize: 14,
       cursor: "pointer",
-      fontFamily: "inherit",
-      letterSpacing: 0.5,
-      transition: "transform 0.15s, box-shadow 0.15s",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+      fontFamily: "var(--font-mono)",
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      transition: "transform 0.15s, box-shadow 0.15s, filter 0.15s",
+      boxShadow: "0 4px 24px rgba(0,17,255,0.25)",
     }),
     label: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: 700,
-      letterSpacing: 1.5,
-      color: "rgba(255,255,255,0.45)",
+      letterSpacing: 2,
+      color: "rgba(0,17,255,0.85)",
       textTransform: "uppercase",
       marginBottom: 6,
       display: "block",
+      fontFamily: "var(--font-mono)",
     },
   };
 
@@ -1504,10 +1619,13 @@ export default function VibeShowdown() {
             gap: 16,
           }}
         >
-          <div style={{ fontSize: 64 }}>🎪</div>
+          <TenkaraLogo size={34} />
           <h1 style={{ ...S.title, fontSize: 32, margin: 0 }}>
-            Loading Showdown...
+            Initializing…
           </h1>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: 2, color: "rgba(0,17,255,0.7)" }}>
+            STATUS: CONNECTING TO FIELD
+          </span>
         </div>
       </div>
     );
@@ -1523,20 +1641,25 @@ export default function VibeShowdown() {
         {ceoResetBtn}
         <div style={S.page}>
           <div style={{ textAlign: "center", marginBottom: 40 }}>
-            <div style={{ fontSize: 64, marginBottom: 8, lineHeight: 1 }}>
-              🎪
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+              <TenkaraLogo size={30} />
             </div>
-            <h1 style={{ ...S.title, fontSize: 44, margin: "0 0 8px" }}>
-              VIBE CODE SHOWDOWN
+            <div style={{ marginBottom: 12 }}>
+              <TechTag>Vibe Code Showdown · Edition 01</TechTag>
+            </div>
+            <h1 style={{ ...S.title, fontSize: 64, margin: "0 0 12px" }}>
+              The Best<br />Vibe-Coded App
             </h1>
             <p
               style={{
-                color: "rgba(255,255,255,0.5)",
-                fontSize: 16,
+                color: "rgba(255,250,208,0.55)",
+                fontSize: 14,
                 margin: 0,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: 1,
               }}
             >
-              Who built the best vibe-coded app? Let's find out.
+              Field-tested judging. Five categories. One winner.
             </p>
           </div>
 
@@ -1680,22 +1803,22 @@ export default function VibeShowdown() {
               <span style={S.label}>Scoring Rubric — 50 Points Total</span>
               <div
                 style={{
-                  background: "rgba(255,230,109,0.1)",
-                  border: "1px solid rgba(255,230,109,0.3)",
-                  borderRadius: 12,
+                  background: "rgba(0,17,255,0.08)",
+                  border: "1px solid rgba(0,17,255,0.3)",
+                  borderRadius: 6,
                   padding: "10px 14px",
                   marginBottom: 16,
                   fontSize: 13,
-                  color: "rgba(255,255,255,0.7)",
+                  color: "rgba(255,250,208,0.7)",
                 }}
               >
-                <strong style={{ color: "#FFE66D" }}>Ben (CEO):</strong> 1–5
+                <strong style={{ color: "#FFFAD0" }}>Ben (CEO):</strong> 1–5
                 per category = up to{" "}
-                <strong style={{ color: "#FFE66D" }}>25 pts</strong>
+                <strong style={{ color: "#FFFAD0" }}>25 pts</strong>
                 <br />
-                <strong style={{ color: "#4ECDC4" }}>Team:</strong> Everyone
+                <strong style={{ color: "#2D4BFF" }}>Team:</strong> Everyone
                 votes 1–5, scores averaged = up to{" "}
-                <strong style={{ color: "#4ECDC4" }}>25 pts</strong>
+                <strong style={{ color: "#2D4BFF" }}>25 pts</strong>
                 <br />
                 <strong style={{ color: "#fff" }}>
                   Max total: 50 pts per participant
@@ -1787,13 +1910,16 @@ export default function VibeShowdown() {
         )}
         <div style={S.page}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <h1 style={{ ...S.title, fontSize: 36, margin: "0 0 6px" }}>
-              🎪 CLAIM YOUR NAME
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+              <TenkaraLogo size={24} />
+            </div>
+            <h1 style={{ ...S.title, fontSize: 48, margin: "0 0 8px" }}>
+              Claim Your Name
             </h1>
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, margin: 0 }}>
+            <p style={{ color: "rgba(255,250,208,0.5)", fontSize: 13, margin: 0, fontFamily: "var(--font-mono)", letterSpacing: 1 }}>
               {sessionLocked
-                ? "Names are locked! Waiting for the order to be determined..."
-                : "Tap your name to join the voting session."}
+                ? "NAMES LOCKED — AWAITING PRESENTATION ORDER…"
+                : "TAP YOUR NAME TO JOIN THE SESSION"}
             </p>
             <div style={{ marginTop: 16, display: "inline-flex", gap: 24, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: "10px 20px", fontSize: 14 }}>
               <span style={{ color: "#4ECDC4" }}>
@@ -2100,12 +2226,12 @@ export default function VibeShowdown() {
         {ceoResetBtn}
         <div style={{ ...S.page, textAlign: "center" }}>
           <div style={{ marginBottom: 32 }}>
-            <div style={{ fontSize: 56, marginBottom: 8 }}>🎡</div>
-            <h1 style={{ ...S.title, fontSize: 36, margin: 0 }}>
-              SPINNING FOR ORDER
+            <div style={{ marginBottom: 14 }}><TechTag color="#FF4800">Randomizing Sequence</TechTag></div>
+            <h1 style={{ ...S.title, fontSize: 52, margin: 0 }}>
+              Spinning for Order
             </h1>
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 15, margin: "8px 0 0" }}>
-              The wheel decides who presents in what order...
+            <p style={{ color: "rgba(255,250,208,0.45)", fontSize: 13, margin: "10px 0 0", fontFamily: "var(--font-mono)", letterSpacing: 1 }}>
+              THE WHEEL DECIDES THE PRESENTATION ORDER…
             </p>
           </div>
           <SpinWheel names={[...claimedVoters].filter((n) => n !== CEO_NAME)} onComplete={onWheelComplete} />
@@ -2330,15 +2456,26 @@ export default function VibeShowdown() {
               })}
 
               <button
-                onClick={() => { if (roundComplete) submitRoundVote(); }}
-                disabled={!roundComplete}
+                onClick={() => { if (roundComplete && !submitting) submitRoundVote(); }}
+                disabled={!roundComplete || submitting}
                 style={{
                   ...S.btn(roundComplete ? "linear-gradient(135deg, #4ECDC4, #45B7D1)" : "rgba(255,255,255,0.1)", roundComplete ? "#000" : "rgba(255,255,255,0.3)"),
-                  width: "100%", marginTop: 8, opacity: roundComplete ? 1 : 0.5, cursor: roundComplete ? "pointer" : "not-allowed",
+                  width: "100%", marginTop: 8, opacity: (roundComplete && !submitting) ? 1 : 0.5, cursor: (roundComplete && !submitting) ? "pointer" : "not-allowed",
                 }}
               >
-                ✅ Submit Vote for {currentCandidate}
+                {submitting ? "Submitting…" : `✅ Submit Vote for ${currentCandidate}`}
               </button>
+              {voteError && (
+                <button
+                  onClick={() => { if (!submitting) submitRoundVote(); }}
+                  style={{
+                    ...S.btn("#FF0202", "#fff"),
+                    width: "100%", marginTop: 8,
+                  }}
+                >
+                  ⚠️ {voteError}
+                </button>
+              )}
             </div>
 
             {/* RIGHT: Rubric sidebar */}
@@ -2412,15 +2549,20 @@ export default function VibeShowdown() {
         <SadRain active={sadRain} />
         <div style={S.page}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <div style={{ fontSize: 56, marginBottom: 8 }}>🎪🦄🌈</div>
-            <h1 style={{ ...S.title, fontSize: 42, margin: 0 }}>
-              THE RESULTS ARE IN
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+              <TenkaraLogo size={24} />
+            </div>
+            <div style={{ marginBottom: 12 }}><TechTag color="#02FF06">Results Compiled · Field Tested</TechTag></div>
+            <h1 style={{ ...S.title, fontSize: 60, margin: 0 }}>
+              The Results Are In
             </h1>
             <p
               style={{
-                color: "rgba(255,255,255,0.4)",
-                margin: "8px 0 0",
-                fontSize: 15,
+                color: "rgba(255,250,208,0.45)",
+                margin: "10px 0 0",
+                fontSize: 13,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: 1,
               }}
             >
               {revealedCount === 0
