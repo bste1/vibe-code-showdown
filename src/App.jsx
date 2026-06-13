@@ -419,51 +419,131 @@ function SadRain({ active }) {
   );
 }
 
-/* ─── STAR BG ───────────────────────────────────────────────────── */
-function StarBg() {
+/* ─── TICKER (industrial signage marquee) ─────────────────────── */
+function Ticker() {
+  const seg =
+    "TENKARA TALENT SHOW   //   EDITION 02   //   VIBE CODE SHOWDOWN   //   FIELD TESTED   //   ALL SYSTEMS ACTIVE   //   ";
   return (
     <div
       style={{
         position: "fixed",
-        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        background: "#0011FF",
+        borderBottom: "1px solid rgba(255,250,208,0.25)",
         overflow: "hidden",
-        zIndex: 0,
+        height: 28,
+        display: "flex",
+        alignItems: "center",
         pointerEvents: "none",
       }}
     >
-      <div className="tk-grid" />
-      <div className="tk-halftone" />
-      {/* Corner registration / serial annotations */}
       <div
         style={{
-          position: "absolute",
-          top: 14,
-          right: 16,
+          whiteSpace: "nowrap",
           fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          letterSpacing: 1.5,
-          color: "rgba(0,17,255,0.55)",
-          textAlign: "right",
-          lineHeight: 1.6,
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 2,
+          color: "#FFFAD0",
+          animation: "marquee 32s linear infinite",
         }}
       >
-        STATUS: LIVE<br />
-        V 1.3 · FIELD&nbsp;TESTED
-      </div>
-      <div
-        style={{
-          position: "absolute",
-          bottom: 14,
-          left: 16,
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          letterSpacing: 1.5,
-          color: "rgba(255,250,208,0.28)",
-        }}
-      >
-        EVERY VALUE HAS INTENT — NOTHING IS DECORATIVE
+        {seg.repeat(6)}
       </div>
     </div>
+  );
+}
+
+/* ─── STAR BG ───────────────────────────────────────────────────── */
+function StarBg() {
+  return (
+    <>
+      <Ticker />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          overflow: "hidden",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <div className="tk-grid" />
+        <div className="tk-halftone" />
+        {/* Oversized chevron motif, right edge */}
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            right: -40,
+            transform: "translateY(-50%)",
+            fontFamily: "var(--font-mono)",
+            fontWeight: 700,
+            fontSize: 220,
+            lineHeight: 0.8,
+            color: "rgba(0,17,255,0.06)",
+            letterSpacing: -20,
+            userSelect: "none",
+          }}
+        >
+          &gt;&gt;
+        </div>
+        {/* Vertical wordmark watermark, left edge */}
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: -10,
+            transform: "translateY(-50%) rotate(180deg)",
+            writingMode: "vertical-rl",
+            fontFamily: "var(--font-mono)",
+            fontSize: 12,
+            letterSpacing: 8,
+            color: "rgba(255,250,208,0.12)",
+            textTransform: "uppercase",
+            userSelect: "none",
+          }}
+        >
+          Automation Dept. — Field Tested — 2149821-083
+        </div>
+        {/* Corner registration / serial annotations */}
+        <div
+          style={{
+            position: "absolute",
+            top: 38,
+            right: 16,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: 1.5,
+            color: "rgba(0,17,255,0.65)",
+            textAlign: "right",
+            lineHeight: 1.6,
+          }}
+        >
+          STATUS: LIVE<br />
+          V 2.40 · FIELD&nbsp;TESTED
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            bottom: 14,
+            left: 16,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: 1.5,
+            color: "rgba(255,250,208,0.28)",
+          }}
+        >
+          EVERY VALUE HAS INTENT — NOTHING IS DECORATIVE
+        </div>
+        {/* Crop marks */}
+        <div style={{ position: "absolute", top: 34, left: 12, width: 14, height: 14, borderLeft: "1px solid rgba(255,250,208,0.25)", borderTop: "1px solid rgba(255,250,208,0.25)" }} />
+        <div style={{ position: "absolute", bottom: 12, right: 12, width: 14, height: 14, borderRight: "1px solid rgba(255,250,208,0.25)", borderBottom: "1px solid rgba(255,250,208,0.25)" }} />
+      </div>
+    </>
   );
 }
 
@@ -1577,7 +1657,7 @@ export default function VibeShowdown() {
       zIndex: 1,
       maxWidth: 1100,
       margin: "0 auto",
-      padding: "32px 24px",
+      padding: "52px 24px 40px",
     },
     title: {
       fontFamily: "var(--font-display)",
@@ -1586,12 +1666,13 @@ export default function VibeShowdown() {
       letterSpacing: "-1px",
       lineHeight: 0.95,
     },
-    card: (color = "rgba(255,250,208,0.035)") => ({
+    card: (color = "rgba(255,250,208,0.04)") => ({
       background: color,
-      border: "1px solid rgba(0,17,255,0.28)",
+      border: "1px solid rgba(0,17,255,0.45)",
       borderRadius: 6,
       padding: 24,
       backdropFilter: "blur(8px)",
+      boxShadow: "inset 0 1px 0 rgba(255,250,208,0.04)",
     }),
     btn: (bg = "#0011FF", color = "#FFFAD0") => ({
       background: bg,
@@ -1609,13 +1690,16 @@ export default function VibeShowdown() {
       boxShadow: "0 4px 24px rgba(0,17,255,0.25)",
     }),
     label: {
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: 700,
       letterSpacing: 2,
-      color: "rgba(0,17,255,0.85)",
+      color: "#FFFAD0",
+      background: "#0011FF",
       textTransform: "uppercase",
-      marginBottom: 6,
-      display: "block",
+      marginBottom: 12,
+      padding: "4px 9px",
+      borderRadius: 3,
+      display: "inline-block",
       fontFamily: "var(--font-mono)",
     },
   };
@@ -1664,19 +1748,48 @@ export default function VibeShowdown() {
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
               <TenkaraLogo size={30} />
             </div>
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 18 }}>
               <TechTag>Automation Dept. · Edition 02 · Field Tested</TechTag>
             </div>
-            <h1 style={{ ...S.title, fontSize: 64, margin: "0 0 12px" }}>
-              Tenkara<br />Talent Show
+            <h1 style={{ ...S.title, fontSize: 92, margin: "0 0 4px", lineHeight: 0.88 }}>
+              Tenkara
             </h1>
+            <div
+              style={{
+                display: "inline-block",
+                background: "#0011FF",
+                color: "#FFFAD0",
+                fontFamily: "var(--font-mono)",
+                fontWeight: 700,
+                fontSize: 26,
+                letterSpacing: 10,
+                textTransform: "uppercase",
+                padding: "8px 20px 8px 30px",
+                margin: "4px 0 18px",
+                boxShadow: "0 8px 32px rgba(0,17,255,0.4)",
+              }}
+            >
+              Talent&nbsp;Show
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontWeight: 700,
+                color: "rgba(0,17,255,0.6)",
+                letterSpacing: 4,
+                fontSize: 16,
+                margin: "0 0 10px",
+              }}
+            >
+              &gt;&gt;&gt;&gt;&gt;&gt;&gt;
+            </div>
             <p
               style={{
-                color: "rgba(255,250,208,0.55)",
-                fontSize: 14,
+                color: "rgba(255,250,208,0.6)",
+                fontSize: 13,
                 margin: 0,
                 fontFamily: "var(--font-mono)",
-                letterSpacing: 1,
+                letterSpacing: 2,
               }}
             >
               FIELD-TESTED JUDGING — FIVE CATEGORIES — ONE WINNER
@@ -1855,29 +1968,52 @@ export default function VibeShowdown() {
                   <div
                     key={cat.id}
                     style={{
-                      background: "rgba(255,255,255,0.04)",
-                      borderRadius: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      background: "rgba(255,255,255,0.03)",
+                      borderRadius: 4,
                       padding: "12px 14px",
-                      borderLeft: "3px solid rgba(255,255,255,0.15)",
+                      borderLeft: "2px solid #0011FF",
                     }}
                   >
                     <div
                       style={{
-                        fontWeight: 800,
-                        color: "#fff",
+                        flexShrink: 0,
+                        width: 34,
+                        height: 34,
+                        background: "#0011FF",
+                        color: "#FFFAD0",
+                        fontFamily: "var(--font-mono)",
+                        fontWeight: 700,
                         fontSize: 14,
-                        marginBottom: 2,
+                        borderRadius: 3,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
-                      {cat.icon} {cat.name}
+                      {cat.icon}
                     </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(255,255,255,0.5)",
-                      }}
-                    >
-                      {cat.desc}
+                    <div>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          color: "#FFFAD0",
+                          fontSize: 14,
+                          marginBottom: 2,
+                        }}
+                      >
+                        {cat.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(255,250,208,0.5)",
+                        }}
+                      >
+                        {cat.desc}
+                      </div>
                     </div>
                   </div>
                 ))}

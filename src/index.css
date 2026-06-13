@@ -45,14 +45,14 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(rgba(0, 17, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 17, 255, 0.06) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 80%);
+  background-image: linear-gradient(rgba(0, 17, 255, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 17, 255, 0.09) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 35%, #000 25%, transparent 85%);
   -webkit-mask-image: radial-gradient(
-    ellipse 80% 70% at 50% 40%,
-    #000 30%,
-    transparent 80%
+    ellipse 90% 80% at 50% 35%,
+    #000 25%,
+    transparent 85%
   );
 }
 .tk-halftone {
@@ -60,17 +60,26 @@ body {
   inset: 0;
   pointer-events: none;
   background-image: radial-gradient(
-    rgba(0, 17, 255, 0.55) 1px,
-    transparent 1.4px
+    rgba(0, 17, 255, 0.6) 1px,
+    transparent 1.5px
   );
   background-size: 7px 7px;
-  opacity: 0.18;
-  mask-image: radial-gradient(ellipse 60% 50% at 70% 10%, #000, transparent 75%);
+  opacity: 0.28;
+  mask-image: radial-gradient(ellipse 65% 55% at 75% 8%, #000, transparent 72%);
   -webkit-mask-image: radial-gradient(
-    ellipse 60% 50% at 70% 10%,
+    ellipse 65% 55% at 75% 8%,
     #000,
-    transparent 75%
+    transparent 72%
   );
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 @keyframes tkScan {
